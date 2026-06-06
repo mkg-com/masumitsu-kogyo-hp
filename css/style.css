@@ -975,6 +975,42 @@ body {
   color: var(--navy);
 }
 
+.form-agree {
+  margin: 16px 0 8px;
+  text-align: center;
+}
+
+.form-agree-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-agree-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--gold);
+}
+
+.form-agree-link {
+  color: var(--gold);
+  text-decoration: underline;
+  transition: color 0.3s;
+}
+
+.form-agree-link:hover {
+  color: var(--gold-light);
+}
+
+.form-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .form-message {
   text-align: center;
   margin-top: 16px;

@@ -64,6 +64,14 @@ const ENTRY_MAP = {
   message: 'entry.190337125'
 };
 
+// ==================== PRIVACY AGREE CHECKBOX ====================
+const agreeCheck = document.getElementById('agreeCheck');
+const submitBtn = document.getElementById('submitBtn');
+
+agreeCheck.addEventListener('change', () => {
+  submitBtn.disabled = !agreeCheck.checked;
+});
+
 const contactForm = document.getElementById('contactForm');
 const formMessage = document.getElementById('formMessage');
 

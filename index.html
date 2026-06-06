@@ -274,7 +274,13 @@
         <label class="form-label">お問い合わせ内容<span class="form-required">必須</span></label>
         <textarea name="message" class="form-input form-textarea" rows="5" placeholder="お問い合わせ内容をご記入ください" required></textarea>
       </div>
-      <button type="submit" class="form-btn">送信する</button>
+      <div class="form-agree">
+        <label class="form-agree-label">
+          <input type="checkbox" id="agreeCheck" required>
+          <span><a href="privacy.html" target="_blank" class="form-agree-link">プライバシーポリシー</a>に同意する</span>
+        </label>
+      </div>
+      <button type="submit" class="form-btn" id="submitBtn" disabled>送信する</button>
     </form>
     <p class="form-message" id="formMessage"></p>
   </div>
