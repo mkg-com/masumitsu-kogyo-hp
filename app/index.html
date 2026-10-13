@@ -1,0 +1,3042 @@
+<!DOCTYPE html>
+<!-- P3b: GitHub Pages配信版SPA（GAS/index.htmlから変換・2026-10-13 フロント分離）
+     データは全て GAS doPost(JSON API) 経由。このページ自体がLIFFエンドポイント。 -->
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0f2b52">
+<title>増光工業社内ポータル</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:"Yu Gothic","Hiragino Sans","Meiryo",sans-serif; }
+body { background:#f4f5f7; min-height:100vh; }
+
+/* ---- トップバー ---- */
+.topbar { background:#1565c0; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; position:sticky; top:0; z-index:50; }
+.logo { font-weight:bold; font-size:15px; white-space:nowrap; }
+/* ハンバーガーメニュー（2026-10-13 CEO指示: 横スクロールタブ→ドロワー化） */
+.menu-btn { background:none; border:none; color:#fff; font-size:21px; cursor:pointer; padding:2px 10px 4px; line-height:1; border-radius:6px; }
+.menu-btn:hover { background:rgba(255,255,255,.12); }
+.nav-backdrop { position:fixed; inset:0; background:rgba(10,20,40,.45); z-index:998; display:none; }
+.nav-backdrop.show { display:block; }
+.nav { position:fixed; top:0; left:-270px; width:248px; height:100%; background:#0f2b52; z-index:999; transition:left .18s ease; padding:14px 10px 20px; overflow-y:auto; display:flex; flex-direction:column; gap:3px; box-shadow:2px 0 10px rgba(0,0,0,.25); box-sizing:border-box; }
+.nav.open { left:0; }
+.nav .nav-title { color:#8fb4e3; font-size:11px; padding:2px 10px 10px; border-bottom:1px solid rgba(255,255,255,.12); margin-bottom:8px; }
+.nav a { color:#cfe2fa; font-size:14px; padding:11px 12px; border-radius:8px; cursor:pointer; white-space:nowrap; user-select:none; }
+.nav a.active { background:#1976d2; color:#fff; font-weight:bold; }
+#q { margin-left:auto; background:#1976d2; border:none; border-radius:6px; padding:7px 12px; color:#fff; font-size:12px; width:170px; }
+#q::placeholder { color:#90caf9; }
+.newbtn { background:#e8a33d; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-size:13px; font-weight:bold; cursor:pointer; white-space:nowrap; }
+.username { font-size:11.5px; color:#b5d4f5; white-space:nowrap; }
+
+/* ---- ツールバー絞り込み ---- */
+.toolbar { display:flex; gap:6px; align-items:center; padding:10px 16px 6px; font-size:12px; color:#556; flex-wrap:wrap; }
+.chipbtn { background:#fff; border:1px solid #d5dce2; padding:4px 12px; border-radius:12px; cursor:pointer; font-size:12px; }
+.chipbtn.on { background:#1976d2; color:#fff; border-color:#1976d2; font-weight:bold; }
+select.fsort { border:1px solid #d5dce2; border-radius:8px; padding:4px 8px; font-size:12px; color:#334; background:#fff; }
+.cnt-info { margin-left:auto; color:#8895a2; font-size:11.5px; }
+
+/* ---- かんばんボード ---- */
+.board { display:flex; gap:10px; padding:12px 16px 28px; overflow-x:auto; align-items:flex-start; }
+.col { background:#ebedf0; border-radius:10px; min-width:205px; width:205px; padding:8px; flex-shrink:0; }
+.col.dragover { outline:2px dashed #e8a33d; background:#fdf8ef; }
+.col-head { font-size:12px; color:#445; margin:2px 4px 8px; display:flex; justify-content:space-between; align-items:center; font-weight:bold; }
+.col-head .cnt { background:#d0d4da; border-radius:10px; padding:0 8px; font-size:11px; color:#556; font-weight:normal; }
+.col-link { font-size:10.5px; color:#1976d2; cursor:pointer; padding:4px 0 2px; text-align:center; display:block; }
+
+/* ---- カード ---- */
+.card { background:#fff; border-radius:8px; padding:9px 10px; margin-bottom:7px; box-shadow:0 1px 3px rgba(0,0,0,.12); border-left:4px solid #1976d2; cursor:pointer; }
+.card:hover { box-shadow:0 2px 6px rgba(0,0,0,.18); }
+.card .client { font-size:10.5px; color:#8895a2; margin-bottom:2px; }
+.card .name { font-size:12.5px; font-weight:bold; color:#1565c0; margin-bottom:4px; line-height:1.35; }
+.chips { display:flex; gap:3px; flex-wrap:wrap; margin-bottom:5px; }
+.chip { font-size:9.5px; padding:1px 7px; border-radius:10px; background:#e2edf9; color:#1976d2; }
+.chip.c-出張 { background:#e8f3fe; color:#1a5ca0; }
+.chip.c-attach { background:#fdf3e3; color:#a05a00; }
+.chip.c-warn { background:#fde8e8; color:#a02020; }
+.chip.c-kari { background:#f0eaf7; color:#6b4fa0; }
+.meta { font-size:10.5px; color:#667; line-height:1.55; }
+
+/* ---- テーブル ---- */
+.tbl-wrap { padding:14px 16px; overflow-x:auto; }
+table.lt { border-collapse:collapse; width:100%; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+.lt th { background:#1565c0; color:#fff; font-size:11.5px; padding:8px 10px; font-weight:normal; text-align:left; white-space:nowrap; }
+.lt td { border-bottom:1px solid #eef1f4; font-size:12px; padding:7px 10px; color:#334; }
+.lt tr:hover td { background:#f3f7fc; }
+.lt .sum td { background:#eef4ee; font-weight:bold; color:#1565c0; }
+
+/* ---- モーダル ---- */
+.overlay { position:fixed; inset:0; background:rgba(10,30,60,.55); z-index:100; display:none; overflow:auto; padding:24px 12px; }
+.modal { width:820px; max-width:97vw; margin:0 auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.35); }
+.mhead { background:#1565c0; color:#fff; padding:13px 18px; display:flex; align-items:center; gap:10px; }
+.mhead h2 { font-size:15px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mhead .close { cursor:pointer; font-size:18px; color:#90caf9; padding:0 4px; }
+.mbody { display:flex; flex-wrap:wrap; }
+.mleft { flex:1.4; min-width:350px; padding:15px 18px; border-right:1px solid #eceff2; overflow:hidden; }
+.mright { flex:1; min-width:280px; padding:15px 18px; background:#fafbfc; }
+.sec { margin-bottom:15px; }
+.sec h4 { font-size:11px; color:#8895a2; margin-bottom:6px; text-transform:uppercase; letter-spacing:.5px; }
+.frm { display:grid; grid-template-columns:1fr 1fr; gap:7px 12px; font-size:12px; color:#334; }
+.frm label { display:flex; flex-direction:column; gap:3px; }
+.frm label span { font-size:10.5px; color:#8895a2; }
+.frm input, .frm select, .frm textarea, .w100 input, .w100 textarea, .w100 select { border:1px solid #dfe4e8; border-radius:7px; padding:6px 9px; font-size:12.5px; color:#223; width:100%; background:#fff; }
+.frm input:focus, .frm select:focus, .frm textarea:focus { outline:2px solid #1976d2; border-color:#1976d2; }
+.w100 { grid-column:1 / -1; }
+.addr-link { font-size:10.5px; color:#1976d2; cursor:pointer; margin-top:2px; }
+.btns { display:flex; gap:7px; margin-top:14px; flex-wrap:wrap; }
+.btn { padding:9px 14px; border-radius:8px; font-size:12.5px; font-weight:bold; border:none; cursor:pointer; }
+.btn.save { background:#1976d2; color:#fff; flex:1; }
+.btn.save:hover { background:#256a35; }
+.btn.promo { background:#fff; border:1px solid #1976d2; color:#1976d2; font-size:11px; }
+.btn.del { background:#fff; border:1px solid #c8d2da; color:#99a; font-size:11.5px; }
+.btn.del:hover { border-color:#d8a0a0; color:#a02020; }
+.btn[disabled] { opacity:.45; cursor:not-allowed; }
+
+/* ---- 日程ピッカー ---- */
+.picker-wrap { background:#f7faf8; border:1px solid #d5dce2; border-radius:10px; padding:10px; margin-bottom:6px; }
+.picker-header { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+.picker-header .month-label { flex:1; text-align:center; font-size:13px; font-weight:bold; color:#1565c0; }
+.picker-header button { background:#1976d2; color:#fff; border:none; border-radius:6px; padding:3px 10px; cursor:pointer; font-size:14px; line-height:1; }
+.picker-mode-group { display:flex; gap:2px; }
+.picker-mode { font-size:11px; padding:3px 8px; border-radius:10px; border:1px solid #1976d2; color:#1976d2; background:#fff; cursor:pointer; white-space:nowrap; }
+.picker-mode.on { background:#1976d2; color:#fff; }
+.picker-range-hint { font-size:10.5px; color:#1976d2; margin-top:2px; min-height:14px; }
+.picker-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.picker-grid .day-head { font-size:10px; text-align:center; color:#99a; padding:2px 0; }
+.picker-grid .day-head.sun { color:#c04040; }
+.picker-grid .day-head.sat { color:#4040c0; }
+.picker-grid .day { font-size:11.5px; text-align:center; padding:5px 2px; border-radius:5px; cursor:pointer; user-select:none; }
+.picker-grid .day:hover { background:#e2edf9; }
+.picker-grid .day.sel { background:#1976d2; color:#fff; font-weight:bold; }
+.picker-grid .day.range-start { background:#1976d2; color:#fff; font-weight:bold; border-radius:5px 0 0 5px; }
+.picker-grid .day.range-end { background:#1976d2; color:#fff; font-weight:bold; border-radius:0 5px 5px 0; }
+.picker-grid .day.range-mid { background:#c8e8cd; border-radius:0; }
+.picker-grid .day.empty { cursor:default; }
+.picker-grid .day.sun { color:#c04040; }
+.picker-grid .day.sat { color:#4040c0; }
+.picker-grid .day.sel.sun,.picker-grid .day.sel.sat { color:#fff; }
+.picker-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; min-height:18px; }
+.picker-chips .pchip { font-size:10.5px; background:#1976d2; color:#fff; padding:2px 8px; border-radius:10px; display:flex; align-items:center; gap:4px; }
+.picker-chips .pchip span { cursor:pointer; color:#d9f0dd; font-size:11px; }
+
+/* ---- 必要物チェックリスト ---- */
+.checklist { list-style:none; }
+.checklist li { display:flex; align-items:center; gap:7px; padding:4px 2px; border-bottom:1px solid #f0f0f0; font-size:12.5px; }
+.checklist li:last-child { border-bottom:none; }
+.checklist input[type=checkbox] { width:16px; height:16px; accent-color:#1976d2; flex-shrink:0; }
+
+/* ---- 添付ファイル ---- */
+.file-item { display:flex; align-items:center; gap:7px; background:#fff; border:1px solid #e2e6ea; border-radius:8px; padding:7px 9px; margin-bottom:5px; font-size:12px; }
+.file-item a { color:#1976d2; text-decoration:none; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.file-item a:hover { text-decoration:underline; }
+.tag-badge { font-size:9.5px; padding:1px 7px; border-radius:8px; background:#e2edf9; color:#1976d2; white-space:nowrap; flex-shrink:0; }
+.upload-zone { border:2px dashed #c8d2da; border-radius:8px; padding:12px; text-align:center; color:#8895a2; font-size:11.5px; cursor:pointer; transition:border-color .2s; }
+.upload-zone.drag { border-color:#1976d2; background:#e9f2fc; }
+.upload-zone:hover { border-color:#1976d2; }
+.tag-sel { border:1px solid #dfe4e8; border-radius:7px; padding:5px 8px; font-size:12px; color:#223; background:#fff; width:100%; margin-top:6px; }
+
+/* ---- トーストとローダー ---- */
+#toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1565c0; color:#fff; padding:11px 24px; border-radius:24px; font-size:13px; display:none; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.25); white-space:nowrap; }
+#busy { position:fixed; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#e8a33d,#1976d2); display:none; z-index:400; animation:slide 1.2s linear infinite; }
+@keyframes slide { 0%{background-position:0 0;} 100%{background-position:200px 0;} }
+.empty { color:#99a; font-size:13px; padding:30px; text-align:center; }
+
+/* ---- 拒否画面 ---- */
+.denied { text-align:center; padding:60px 20px; color:#667; }
+.denied h2 { font-size:18px; color:#1565c0; margin-bottom:12px; }
+
+/* ---- 準備中プレースホルダ ---- */
+.placeholder { padding:40px; text-align:center; color:#8895a2; }
+.placeholder h3 { font-size:16px; margin-bottom:8px; color:#445; }
+
+/* ---- スケジュール反映ボタン ---- */
+.btn.schedule { background:#fff; border:1px solid #1976d2; color:#1976d2; font-size:11.5px; }
+.btn.schedule:hover { background:#e9f2fc; }
+.btn.schedule.disabled { border-color:#d5dce2; color:#99a; cursor:not-allowed; }
+
+/* ---- 配車表タブ ---- */
+.haisha-ctrl { display:flex; align-items:center; gap:8px; padding:10px 16px 6px; flex-wrap:wrap; }
+.haisha-ctrl .month-nav { display:flex; align-items:center; gap:4px; }
+.haisha-ctrl .month-nav button { background:#1976d2; color:#fff; border:none; border-radius:6px; padding:4px 12px; cursor:pointer; font-size:14px; line-height:1.2; }
+.haisha-ctrl .month-nav .cur-month { font-size:13px; font-weight:bold; color:#1565c0; min-width:80px; text-align:center; }
+.haisha-ctrl .haisha-btns { display:flex; gap:6px; margin-left:auto; }
+.haisha-ctrl .haisha-btns a { font-size:12px; padding:6px 12px; border-radius:7px; border:1px solid #1976d2; color:#1976d2; cursor:pointer; text-decoration:none; white-space:nowrap; }
+.haisha-ctrl .haisha-btns a:hover { background:#e9f2fc; }
+.haisha-scroll { overflow-x:auto; padding:0 16px 20px; }
+.haisha-tbl { border-collapse:collapse; font-size:11.5px; white-space:nowrap; min-width:400px; }
+.haisha-tbl th, .haisha-tbl td { border:1px solid #ccd1d9; padding:4px 6px; text-align:center; max-width:80px; overflow:hidden; text-overflow:ellipsis; }
+.haisha-tbl tr:first-child th, .haisha-tbl tr:first-child td { position:sticky; top:0; z-index:2; background:#f0f3f6; font-weight:bold; border-bottom:2px solid #aab2b8; }
+
+/* ---- 配置タブ ---- */
+.haichi-wrap { padding:14px 16px 20px; }
+.haichi-today { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.1); padding:14px 16px; margin-bottom:14px; }
+.haichi-today h4 { font-size:12px; color:#8895a2; margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px; }
+.haichi-today-row { display:flex; gap:20px; flex-wrap:wrap; }
+.haichi-today-item { flex:1; min-width:140px; }
+.haichi-today-item .day-label { font-size:11px; color:#667; margin-bottom:4px; }
+.haichi-today-item .day-val { font-size:14px; font-weight:bold; color:#1565c0; }
+.haichi-today-item .day-val.none { color:#8895a2; font-weight:normal; font-size:13px; }
+.haichi-week { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.1); padding:14px 16px; }
+.haichi-week h4 { font-size:12px; color:#8895a2; margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px; }
+.haichi-week-scroll { overflow-x:auto; }
+.haichi-week-tbl { border-collapse:collapse; font-size:11px; width:100%; }
+.haichi-week-tbl th { background:#1565c0; color:#fff; padding:5px 8px; font-weight:normal; text-align:center; white-space:nowrap; }
+.haichi-week-tbl th.name-col { text-align:left; min-width:55px; }
+.haichi-week-tbl td { border-bottom:1px solid #eef1f4; padding:5px 7px; text-align:center; font-size:11px; color:#334; white-space:nowrap; }
+.haichi-week-tbl td.name-col { text-align:left; font-weight:bold; color:#1565c0; }
+.haichi-week-tbl tr:hover td { background:#f3f7fc; }
+.haichi-ctrl { display:flex; align-items:center; gap:8px; padding:10px 16px 6px; flex-wrap:wrap; }
+.haichi-ctrl .refresh-btn { margin-left:auto; font-size:12px; padding:5px 12px; border-radius:7px; border:1px solid #c8d2da; color:#556; cursor:pointer; background:#fff; }
+.haichi-ctrl .refresh-btn:hover { border-color:#1976d2; color:#1976d2; }
+
+/* ---- 外注予定タブ（バッチ4） ---- */
+.gaichu-tbl { border-collapse:collapse; font-size:12px; white-space:nowrap; min-width:300px; background:#fff; }
+.gaichu-tbl th, .gaichu-tbl td { border:1px solid #ccd1d9; padding:5px 10px; text-align:center; }
+.gaichu-tbl th { background:#1565c0; color:#fff; font-weight:normal; position:sticky; top:0; z-index:2; }
+.gaichu-tbl td.gaichu-day { font-weight:bold; color:#445; }
+.gaichu-tbl tr.wk-sat td { background:#eef3fb; }
+.gaichu-tbl tr.wk-sun td { background:#fdf0f0; }
+.gaichu-company { font-size:13px; font-weight:bold; color:#1565c0; }
+
+/* ---- タイムラインビュー ---- */
+.tl-view-toggle { display:flex; align-items:center; gap:6px; padding:8px 16px 0; }
+.tl-toggle-btn { background:#fff; border:1px solid #c8d2da; border-radius:6px; padding:5px 12px; font-size:12px; cursor:pointer; color:#556; }
+.tl-toggle-btn.on { background:#1976d2; color:#fff; border-color:#1976d2; font-weight:bold; }
+.tl-show-done-wrap { margin-left:auto; display:flex; align-items:center; gap:5px; font-size:12px; color:#556; }
+.tl-show-done-wrap input { accent-color:#1976d2; }
+.tl-outer { padding:10px 16px 24px; }
+.tl-scroll-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.tl-table { border-collapse:collapse; min-width:600px; }
+.tl-name-col { position:sticky; left:0; z-index:5; background:#fff; white-space:normal; word-break:break-all; line-height:1.3; width:260px; min-width:200px; max-width:260px; font-size:11.5px; font-weight:bold; color:#1565c0; padding:5px 8px; border-bottom:1px solid #eef1f4; border-right:2px solid #d0d4da; cursor:pointer; }
+.tl-name-col:hover { background:#f3f7fc; }
+.tl-head-name { position:sticky; left:0; z-index:6; background:#1565c0; color:#fff; font-size:11px; font-weight:normal; padding:6px 8px; border-right:2px solid #1976d2; min-width:200px; width:260px; }
+.tl-head-month { background:#1565c0; color:#fff; font-size:11px; font-weight:normal; padding:6px 4px; text-align:center; min-width:80px; width:88px; white-space:nowrap; border-left:1px solid #1976d2; }
+.tl-head-month.cur-month { background:#1e6635; }
+.tl-head-half { background:#1565c0; color:#fff; font-size:10px; font-weight:normal; padding:4px 2px; text-align:center; min-width:40px; width:44px; white-space:nowrap; border-left:1px solid #1976d2; }
+.tl-head-half.cur-month { background:#1e6635; }
+.tl-cell { min-width:40px; width:44px; padding:3px 2px; border-bottom:1px solid #eef1f4; border-left:1px solid #f0f0f0; vertical-align:middle; position:relative; }
+.tl-cell.cur-month { background:#f0fbf3; }
+.tl-bar-wrap { position:relative; height:22px; }
+.tl-bar { height:20px; border-radius:4px; display:flex; align-items:center; font-size:10px; color:#fff; font-weight:bold; overflow:hidden; white-space:nowrap; padding:0 5px; box-sizing:border-box; cursor:pointer; position:absolute; top:1px; }
+.tl-bar:hover { filter:brightness(0.9); }
+.tl-bar.kari { border:2px dashed rgba(255,255,255,0.7); opacity:0.75; }
+.tl-bar .tl-ninzu { margin-left:auto; flex-shrink:0; font-size:9px; font-weight:bold; opacity:.95; padding-left:2px; text-shadow:0 0 2px rgba(0,0,0,.35); }
+.tl-bar.st-未定 { background:#aab2b8; }
+.tl-bar.st-決定 { background:#1976d2; }
+.tl-bar.st-進行中 { background:#e8a33d; }
+.tl-bar.st-完了 { background:#7ab0c8; }
+.tl-undated { padding:10px 0; }
+.tl-undated-title { font-size:11.5px; color:#8895a2; font-weight:bold; margin-bottom:6px; }
+.tl-undated-chips { display:flex; flex-wrap:wrap; gap:5px; }
+.tl-undated-chip { background:#ebedf0; border-radius:12px; padding:3px 10px; font-size:11px; color:#445; cursor:pointer; }
+.tl-undated-chip:hover { background:#d5dce2; }
+
+/* ---- スマホ最適化（640px以下） ---- */
+@media (max-width:640px){
+  .topbar { padding:8px 10px; gap:6px; }
+  .logo { font-size:13.5px; }
+  #q { margin-left:0; flex:1; width:auto; min-width:0; }
+  .newbtn { padding:8px 10px; font-size:12px; }
+  .toolbar { padding:8px 10px 6px; }
+  .board { padding:10px 10px 20px; gap:8px; }
+  .col { min-width:178px; width:178px; }
+  .overlay { padding:0; }
+  .modal { width:100vw; max-width:100vw; min-height:100vh; border-radius:0; }
+  .mleft, .mright { min-width:0; flex:1 1 100%; }
+  .mleft { border-right:none; border-bottom:1px solid #eceff2; }
+  .frm { grid-template-columns:1fr; }
+  .frm input, .frm select, .frm textarea, .w100 input, .w100 textarea { font-size:16px; padding:9px 10px; }
+  .btn { padding:12px 10px; font-size:14px; }
+  .tl-name-col, .tl-head-name { min-width:130px; width:130px; max-width:130px; font-size:10.5px; }
+  .tl-head-half, .tl-cell { min-width:34px; width:36px; }
+}
+
+/* ---- 仮日程チップグリッドピッカー ---- */
+.kari-picker-wrap { background:#f7faf8; border:1px solid #d5dce2; border-radius:10px; padding:10px; margin-bottom:6px; }
+.kari-chip-scroll { max-height:200px; overflow-y:auto; border:1px solid #d5dce2; border-radius:8px; padding:6px; margin-bottom:6px; background:#fff; }
+.kari-chip-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.kari-year-label { grid-column:1/-1; font-size:10.5px; color:#8895a2; text-align:center; padding:4px 0 2px; font-weight:bold; }
+.kari-chip-item { font-size:11.5px; padding:5px 4px; border-radius:8px; cursor:pointer; text-align:center; user-select:none; background:#f0eaf7; border:1px solid #c9b8e8; color:#6b4fa0; white-space:nowrap; }
+.kari-chip-item.on { background:#6b4fa0; color:#fff; border-color:#6b4fa0; font-weight:bold; }
+.kari-chip-item:hover { filter:brightness(0.93); }
+.kari-picker-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; min-height:18px; }
+.kari-picker-chips .pchip { font-size:10.5px; background:#6b4fa0; color:#fff; padding:2px 8px; border-radius:10px; display:flex; align-items:center; gap:4px; }
+.kari-picker-chips .pchip span { cursor:pointer; color:#ddd0f7; font-size:11px; }
+</style>
+</head><body>
+<div id="busy"></div>
+
+<div class="topbar">
+  <button class="menu-btn" id="menuBtn" onclick="toggleNav()" title="メニュー">☰</button>
+  <div class="logo">増光工業社内ポータル</div>
+  <input id="q" placeholder="🔍 取引先・案件名">
+  <span class="username" id="userName"></span>
+  <button class="newbtn" id="newBtn" style="display:none" onclick="openNew()">＋ 新規案件</button>
+</div>
+
+<div class="nav-backdrop" id="navBackdrop" onclick="toggleNav(false)"></div>
+<div class="nav" id="navBar"><!-- タブは setupNav() が権限に応じて並び順どおり生成（ドロワー式・2026-10-13 CEO指示） --></div>
+
+<div id="view"><div class="empty">読み込み中...</div></div>
+
+<div class="overlay" id="ov"><div class="modal" id="modal"></div></div>
+<div id="toast"></div>
+
+<script>
+/* P3b: GAS配信版のテンプレート変数（<?= ... ?>）はSPAではJSで解決する */
+var GAS_EXEC = 'https://script.google.com/macros/s/AKfycbzFwwNdEKECKH1cKyDy6-JBCwmulqsdHufYrm01bDJsk3aKoWLGW_8Bed2WCmlQCtS6/exec'; // JSON API（doPost）
+var QS_ = new URLSearchParams(location.search);
+var TOKEN = QS_.get('k') || '';          // 社員トークン（?k=）
+var LIFF_ID = '2011981643-GBX2hvdc';     // このページ自体がLIFFエンドポイント
+var VIEWER_URL = '';                     // スケジュール閲覧用スプシ（api_bootstrap応答のviewerUrlで解決）
+var LT_TOKEN = QS_.get('lt') || '';      // 中継ページ(?lt)互換（あればliff.initをスキップ）
+var LINE_IDT = '';              // liff.getIDToken() の生JWT（申請APIに渡す用）
+var B = null;     // bootstrap data
+var V = 'sched';  // current view（初期表示はスケジュール・2026-10-12 CEO指示）
+var boardSubView = (function() {
+  try { return localStorage.getItem('boardSubView') || 'timeline'; } catch(e) { return 'timeline'; }
+})();  // 'timeline' | 'board'
+var filterClient = ''; // 取引先絞り込み
+var filterStaff = '';  // 担当者絞り込み
+var tlShowDone = false; // タイムライン: 完了も表示
+var trashCache = null;
+
+/* =========================================================
+   gasCall / run / runBg / toast / toastUndo
+   P3b: google.script.run → fetch(GAS doPost JSON API) に差し替え。
+   ボディは Content-Type: text/plain のJSON {fn, args}（プリフライト回避）。
+   doPost応答 {ok:true,result} が従来のwithSuccessHandler、
+   {ok:false,error}・HTTP/通信エラーが withFailureHandler に相当する。
+========================================================= */
+function gasCall(fn, args, onOk, onErr) {
+  fetch(GAS_EXEC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ fn: fn, args: args || [] }),
+  }).then(function(res) {
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }).then(function(j) {
+    if (!j || j.ok !== true) throw new Error((j && j.error) || '不明なエラー');
+    // setTimeoutでPromise連鎖の外へ出す（描画側の例外がonErrに化けるのを防ぐ）
+    setTimeout(function() { onOk && onOk(j.result); }, 0);
+  }).catch(function(e) {
+    var err = (e && e.message) ? e : new Error('通信に失敗しました');
+    setTimeout(function() { onErr && onErr(err); }, 0);
+  });
+}
+function run(fn, args, cb) {
+  document.getElementById('busy').style.display = 'block';
+  gasCall(fn, args,
+    function(r) { document.getElementById('busy').style.display = 'none'; cb && cb(r); },
+    function(e) { document.getElementById('busy').style.display = 'none'; toast('エラー: ' + e.message); });
+}
+function runBg(fn, args) {
+  gasCall(fn, args,
+    function(r) { if (r && r.ok === false) { toast('保存エラー: ' + (r.error || '') + '（再読込します）'); reload(); } },
+    function(e) { toast('通信エラー: ' + e.message + '（再読込します）'); reload(); });
+}
+function reload(cb) { trashCache = null; run('api_bootstrap', [TOKEN], function(r) { B = r; if (r && r.viewerUrl != null) VIEWER_URL = String(r.viewerUrl); if (!r.authorized) { showDenied(); return; } setupNav(); cb && cb(); render(); }); }
+function toast(m) { var t = document.getElementById('toast'); t.textContent = m; t.style.display = 'block'; setTimeout(function() { t.style.display = 'none'; }, 2500); }
+function toastUndo(m, undoFn) {
+  var t = document.getElementById('toast');
+  t.innerHTML = esc(m) + ' <a style="color:#f0c987;cursor:pointer;font-weight:bold;margin-left:8px" id="undoLink">↩ 元に戻す</a>';
+  t.style.display = 'block';
+  document.getElementById('undoLink').onclick = function() { t.style.display = 'none'; undoFn(); };
+  setTimeout(function() { t.style.display = 'none'; }, 7000);
+}
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+}
+
+/* =========================================================
+   認証・セットアップ
+========================================================= */
+function showDenied() {
+  document.getElementById('view').innerHTML =
+    '<div class="denied"><h2>アクセスできません</h2><p>会社から配布された自分専用のURLから開いてください。</p></div>';
+}
+function toggleNav(force) {
+  var nav = document.getElementById('navBar');
+  var bd = document.getElementById('navBackdrop');
+  var open = (typeof force === 'boolean') ? force : !nav.classList.contains('open');
+  nav.classList.toggle('open', open);
+  bd.classList.toggle('show', open);
+}
+
+function setupNav() {
+  var nav = document.getElementById('navBar');
+  nav.innerHTML = ''; // 毎回ゼロから並び順どおりに再構築（権限で非表示のタブは詰めて表示）
+  var ttl = document.createElement('div');
+  ttl.className = 'nav-title'; ttl.textContent = 'メニュー';
+  nav.appendChild(ttl);
+  function addTab(v, label) {
+    var a = document.createElement('a');
+    a.dataset.v = v; a.textContent = label; nav.appendChild(a);
+  }
+  // L3（協力会社）: 外注予定＋配車表のみの限定ナビ（バッチ4・2026-10-13）
+  if (B.isL3) {
+    addTab('gaichu', '🚚 外注予定');
+    addTab('haisha', '🚗 配車表');
+    if (V !== 'gaichu' && V !== 'haisha') V = 'gaichu';
+    document.getElementById('q').style.display = 'none';
+    document.getElementById('newBtn').style.display = 'none';
+  } else {
+    document.getElementById('q').style.display = '';
+    // 並び順（2026-10-12夜 CEO指示＋バッチ4で外注予定を管理者群の手前に追加。
+    //   バッチ5で「経費報告」→「経費申請」に改名・2026-10-13 CEO指示）:
+    // スケジュール｜配車表｜検索｜給与明細｜材料報告｜経費申請｜進行ボード｜完了｜外注予定(L0/L1)｜(管理者: 経費承認｜操作ログ｜ゴミ箱｜LINE承認)
+    // 表示はbootstrapの権限フラグ・取得は各APIがサーバ側で毎回再チェック
+    addTab('sched', '📅 スケジュール');
+    addTab('haisha', '🚗 配車表');
+    if (B.kyuyoAccess && B.kyuyoAccess !== 'none') addTab('kyuyo', '💴 給与明細');
+    if (B.zairyoAllowed) addTab('zairyo', '📦 材料報告');
+    if (B.keihiAccess && B.keihiAccess !== 'none') addTab('keihi', '💰 経費申請');
+    addTab('board', '📋 進行ボード');
+    addTab('search', '🔍 検索');
+    addTab('done', '✅ 完了アーカイブ');
+    if (B.gaichuAccess === 'all') addTab('gaichu', '🚚 外注予定');
+    if (B.isAdmin) {
+      addTab('keihiadmin', '💼 経費承認');
+      addTab('log', '📝 操作ログ');
+      addTab('trash', '🗑 ゴミ箱');
+      if (B.liffEnabled) addTab('linelink', '🔗 LINE承認');
+      document.getElementById('newBtn').style.display = '';
+    }
+  }
+  // ナビクリックイベント（選択したらドロワーを閉じる）
+  nav.querySelectorAll('a').forEach(function(a) {
+    a.onclick = function() { V = a.dataset.v; toggleNav(false); render(); };
+  });
+  // 検索欄は進行ボード・完了・検索ビューでのみ絞り込みに使う（他ビューの再読込スパムを防ぐ）
+  document.getElementById('q').oninput = function() {
+    if (V === 'board' || V === 'done' || V === 'search') render();
+  };
+}
+
+/* =========================================================
+   LINEログイン（LIFF）P3a
+   - ?k トークンがあるときは一切動かない（従来動作そのまま）
+   - ?k なし → まず従来どおり空トークンで bootstrap（Google管理者
+     セッションを活かす）→ 不許可かつ LIFF_ID 設定済みのときだけ LIFF 起動
+========================================================= */
+function applyBootstrap(r) {
+  B = r;
+  if (r && r.viewerUrl != null) VIEWER_URL = String(r.viewerUrl); // P3b: bootstrap応答で解決
+  document.getElementById('userName').textContent = r.userName;
+  setupNav();
+  render();
+}
+
+function liffScreen(msg) {
+  document.getElementById('view').innerHTML =
+    '<div class="denied"><h2>増光工業社内ポータル</h2><p>' + esc(msg) + '</p></div>';
+}
+
+function startLiffFlow() {
+  // 中継ページ(m-kgroup.com/portal)で取得済みのIDトークンがあればliff.init不要（GASリダイレクト相性対策）
+  if (LT_TOKEN) {
+    LINE_IDT = LT_TOKEN;
+    liffScreen('本人確認中...');
+    run('api_lineBootstrap', [LINE_IDT], handleLineStatus);
+    return;
+  }
+  if (typeof liff === 'undefined') { showDenied(); return; }
+  liffScreen('LINEログイン中...');
+  liff.init({ liffId: LIFF_ID }).then(function() {
+    if (!liff.isLoggedIn()) { liff.login(); return; }  // ログイン画面へリダイレクト
+    LINE_IDT = liff.getIDToken() || '';
+    if (!LINE_IDT) {
+      liffScreen('LINEの本人確認情報を取得できませんでした。一度閉じて、もう一度開いてください。');
+      return;
+    }
+    run('api_lineBootstrap', [LINE_IDT], handleLineStatus);
+  }).catch(function(e) {
+    liffScreen('LINEログインの初期化に失敗しました。一度閉じて、もう一度開いてください。（' + (e && e.message ? e.message : e) + '）');
+  });
+}
+
+function handleLineStatus(r) {
+  if (!r) { showDenied(); return; }
+  switch (r.status) {
+    case 'ok':
+      // サーバ検証済み。以後は 'LIFF:'+IDトークン を資格情報として全APIに渡す
+      TOKEN = 'LIFF:' + LINE_IDT;
+      run('api_bootstrap', [TOKEN], function(b) {
+        if (!b || !b.authorized) { showDenied(); return; }
+        applyBootstrap(b);
+      });
+      break;
+    case 'unlinked':
+      renderCodeEntry();
+      break;
+    case 'pending':
+      liffScreen('利用申請を受け付けています。管理者の承認をお待ちください。（承認待ち）');
+      break;
+    case 'suspended':
+      liffScreen('このLINEアカウントの利用は停止されています。管理者に連絡してください。');
+      break;
+    // 'l3_preparing' はバッチ4（2026-10-13）で廃止。L3は 'ok' → 限定bootstrapへ
+    case 'invalid':
+      liffScreen('LINEの本人確認の有効期限が切れています。一度閉じて、もう一度開いてください。');
+      break;
+    default:
+      showDenied();
+  }
+}
+
+function renderCodeEntry(errMsg) {
+  document.getElementById('view').innerHTML =
+    '<div class="denied"><h2>はじめまして</h2>' +
+    '<p style="margin-bottom:16px">管理者から受け取った招待コードを入力してください。</p>' +
+    '<input id="inviteCode" class="fsort" placeholder="例: MK-XXXXXX" autocomplete="off" autocapitalize="characters" ' +
+    'style="font-size:16px;padding:10px 12px;min-width:200px;text-align:center;letter-spacing:1px">' +
+    (errMsg ? '<p id="codeErr" style="color:#d64545;font-size:13px;margin-top:10px">' + esc(errMsg) + '</p>' : '') +
+    '<div style="margin-top:16px"><button class="newbtn" id="codeBtn" onclick="submitInviteCode()">送信</button></div></div>';
+  var el = document.getElementById('inviteCode');
+  if (el) el.onkeydown = function(e) { if (e.key === 'Enter') submitInviteCode(); };
+}
+
+function submitInviteCode() {
+  var el = document.getElementById('inviteCode');
+  var code = el ? el.value.trim() : '';
+  if (!code) { toast('招待コードを入力してください'); return; }
+  var btn = document.getElementById('codeBtn');
+  if (btn) btn.disabled = true;
+  document.getElementById('busy').style.display = 'block';
+  gasCall('api_lineRedeemCode', [LINE_IDT, code],
+    function(r) {
+      document.getElementById('busy').style.display = 'none';
+      if (r && r.ok) { run('api_lineBootstrap', [LINE_IDT], handleLineStatus); return; }
+      renderCodeEntry('登録に失敗しました。もう一度お試しください。');
+    },
+    function(e) {
+      document.getElementById('busy').style.display = 'none';
+      renderCodeEntry(e && e.message ? e.message : '登録に失敗しました。もう一度お試しください。');
+    });
+}
+
+/* ---- 管理者向け: LINE紐付け承認タブ ---- */
+var lineLinksCache = [];
+
+function renderLineLinkView(data) {
+  lineLinksCache = data || [];
+  var issueBtn = '<div style="margin-bottom:10px"><button class="newbtn" onclick="lineIssueCodes()">🎟 コード一括発行</button>' +
+    '<span style="font-size:11px;color:#8895a2;margin-left:10px">招待コード未記入の行に MK-XXXXXX を自動採番します</span></div>';
+  if (!lineLinksCache.length) {
+    return issueBtn + '<div class="empty">LINE紐付けの登録行はまだありません（スプシの「LINE紐付け」シートに氏名・権限・状態=未使用の行を用意してください）</div>';
+  }
+  var levelOpts = ['L0', 'L1', 'L2', 'L2b', 'L3'].map(function(l) {
+    return '<option' + (l === 'L2' ? ' selected' : '') + '>' + l + '</option>';
+  }).join('');
+  var rows = lineLinksCache.map(function(r, i) {
+    var action = '';
+    if (r.status === '承認待ち') {
+      action = '<select id="lvl_' + i + '" class="fsort">' + levelOpts + '</select> ' +
+        '<input id="cmp_' + i + '" class="fsort" placeholder="所属会社(L3のみ)" style="width:120px"> ' +
+        '<span class="chipbtn" onclick="lineApprove(' + i + ')">✔ 承認</span> ' +
+        '<span class="chipbtn" onclick="lineReject(' + i + ')">✕ 却下</span>';
+    } else if (r.status === '承認済み') {
+      action = '<span class="chipbtn" onclick="lineReject(' + i + ')">⏸ 停止</span>';
+    }
+    var codeCell = r.code
+      ? '<span style="font-family:monospace">' + esc(r.code) + '</span> ' +
+        (r.codeUsed
+          ? '<span style="font-size:11px;color:#8895a2">使用済み</span>'
+          : '<span style="font-size:11px;color:#2e7d32;font-weight:bold">未使用</span>')
+      : '<span style="font-size:11px;color:#8895a2">—</span>';
+    return '<tr>' +
+      '<td>' + esc(r.displayName || '（表示名なし）') + '</td>' +
+      '<td><b>' + esc(r.name) + '</b></td>' +
+      '<td>' + esc(r.level) + (r.company ? '（' + esc(r.company) + '）' : '') + '</td>' +
+      '<td style="white-space:nowrap">' + codeCell + '</td>' +
+      '<td>' + esc(r.status) + '</td>' +
+      '<td>' + esc(r.requestedAt) + '</td>' +
+      '<td>' + esc(r.approvedAt) + '</td>' +
+      '<td style="white-space:nowrap">' + action + '</td></tr>';
+  }).join('');
+  return issueBtn + '<div class="tbl-wrap"><table class="lt">' +
+    '<tr><th>LINE表示名</th><th>紐付け氏名</th><th>権限</th><th>招待コード</th><th>状態</th><th>申請日時</th><th>承認日時</th><th>操作</th></tr>' +
+    rows + '</table>' +
+    '<p style="font-size:11px;color:#8895a2;margin-top:8px">権限: L0=管理者相当 / L1=管理（外注予定の会社切替可） / L2=社員 / L2b=専属外注（添付「名簿」閲覧不可） / L3=協力会社（外注予定[自社分のみ]＋配車表だけ表示・所属会社が必須）<br>' +
+    '招待コード運用: シートに氏名・権限・所属・状態=未使用の行を用意→「コード一括発行」→コードを本人にだけ渡す。本人がコード入力すると即時承認済みになります。</p></div>';
+}
+
+function lineIssueCodes() {
+  if (!window.confirm('招待コード未記入の行にコードを一括発行しますか？')) return;
+  run('api_lineIssueCodes', [TOKEN], function(r) {
+    toast((r && r.issued != null ? r.issued : 0) + '件発行しました');
+    render();
+  });
+}
+
+function lineApprove(i) {
+  var r = lineLinksCache[i];
+  if (!r) return;
+  var lvlEl = document.getElementById('lvl_' + i);
+  var cmpEl = document.getElementById('cmp_' + i);
+  var lvl = lvlEl ? lvlEl.value : '';
+  var cmp = cmpEl ? cmpEl.value.trim() : '';
+  if (lvl === 'L3' && !cmp) { toast('L3は所属会社を入力してください'); return; }
+  if (!window.confirm('「' + (r.name || r.displayName) + '」を権限 ' + lvl + ' で承認しますか？\n（LINE表示名: ' + (r.displayName || '不明') + '）')) return;
+  run('api_lineApprove', [TOKEN, r.userId, lvl, cmp], function() { toast('承認しました'); render(); });
+}
+
+function lineReject(i) {
+  var r = lineLinksCache[i];
+  if (!r) return;
+  if (!window.confirm('「' + (r.name || r.displayName) + '」を却下/停止しますか？')) return;
+  run('api_lineReject', [TOKEN, r.userId], function() { toast('停止しました'); render(); });
+}
+
+/* =========================================================
+   日程フォーマット変換
+   保存形式: '2026-10-01;2026-10-08~2026-10-09'
+   表示形式: '10/1、10/8〜9'
+========================================================= */
+function parseDateStr(s) {
+  // Returns Date[]
+  if (!s || !s.trim()) return [];
+  var dates = [];
+  s.split(';').forEach(function(seg) {
+    seg = seg.trim();
+    if (!seg) return;
+    if (seg.indexOf('~') >= 0) {
+      var parts = seg.split('~');
+      var start = new Date(parts[0].trim() + 'T00:00:00');
+      var end = new Date(parts[1].trim() + 'T00:00:00');
+      if (isNaN(start) || isNaN(end)) return;
+      var cur = new Date(start);
+      while (cur <= end) {
+        dates.push(new Date(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+    } else {
+      var d = new Date(seg + 'T00:00:00');
+      if (!isNaN(d)) dates.push(d);
+    }
+  });
+  return dates;
+}
+function serializeDates(dates) {
+  // Date[] → '2026-10-01;2026-10-08~2026-10-09'
+  if (!dates || !dates.length) return '';
+  var toYmd = function(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+  // 重複日を一意化してからソート
+  var seen = {};
+  var unique = [];
+  dates.forEach(function(d) { var k = toYmd(d); if (!seen[k]) { seen[k] = true; unique.push(d); } });
+  var sorted = unique.sort(function(a, b) { return a - b; });
+  var segs = [];
+  var i = 0;
+  while (i < sorted.length) {
+    var start = sorted[i];
+    var end = sorted[i];
+    while (i + 1 < sorted.length) {
+      var next = new Date(end); next.setDate(next.getDate() + 1);
+      if (toYmd(next) === toYmd(sorted[i + 1])) { end = sorted[i + 1]; i++; }
+      else break;
+    }
+    if (toYmd(start) === toYmd(end)) segs.push(toYmd(start));
+    else segs.push(toYmd(start) + '~' + toYmd(end));
+    i++;
+  }
+  return segs.join(';');
+}
+function formatDateDisplay(s) {
+  // '2026-10-01;2026-10-08~2026-10-09' → '10/1、10/8〜9'
+  if (!s || !s.trim()) return '';
+  var parts = [];
+  s.split(';').forEach(function(seg) {
+    seg = seg.trim();
+    if (!seg) return;
+    if (seg.indexOf('~') >= 0) {
+      var ps = seg.split('~');
+      var s1 = ps[0].trim(), s2 = ps[1].trim();
+      var m1 = Number(s1.slice(5, 7)), d1 = Number(s1.slice(8, 10));
+      var m2 = Number(s2.slice(5, 7)), d2 = Number(s2.slice(8, 10));
+      if (m1 === m2) parts.push(m1 + '/' + d1 + '〜' + d2);
+      else parts.push(m1 + '/' + d1 + '〜' + m2 + '/' + d2);
+    } else {
+      var m = Number(seg.slice(5, 7)), d = Number(seg.slice(8, 10));
+      parts.push(m + '/' + d);
+    }
+  });
+  return parts.join('、');
+}
+
+/* =========================================================
+   期間別人数（半月単位・バッチ3 2026-10-13）
+   保存形式: '2026-11前:3;2026-11後:5'（サーバ側 normalizeKikanNinzu_ と同形式）
+========================================================= */
+function parseKikanClient(str) {
+  // 不正セグメントは黙って読み飛ばす（表示用の寛容パース。保存時はサーバが厳格検証）
+  var map = {};
+  String(str || '').split(';').forEach(function(seg) {
+    seg = seg.trim(); if (!seg) return;
+    var ci = seg.indexOf(':'); if (ci < 0) return;
+    var k = seg.slice(0, ci).trim(), v = seg.slice(ci + 1).trim();
+    if (!/^\d{4}-(0[1-9]|1[0-2])(前|後)$/.test(k)) return;
+    if (!/^\d{1,2}$/.test(v)) return;
+    var n = parseInt(v, 10);
+    if (isNaN(n) || n < 0 || n > 99) return;
+    map[k] = n;
+  });
+  return map;
+}
+
+// 閲覧画面用表示: '2026-11前:3;2026-11後:5' → '👥 11月前半3名・後半5名'
+function kikanNinzuDisplay(str) {
+  var map = parseKikanClient(str);
+  var keys = Object.keys(map).sort();
+  if (!keys.length) return '';
+  var curY = new Date().getFullYear();
+  var parts = [];
+  var lastYM = '';
+  keys.forEach(function(k) {
+    var y = Number(k.slice(0, 4)), m = Number(k.slice(5, 7)), half = k.slice(7);
+    var ym = k.slice(0, 7);
+    var halfLabel = (half === '前' ? '前半' : '後半') + map[k] + '名';
+    if (ym === lastYM) {
+      parts[parts.length - 1] += '・' + halfLabel;
+    } else {
+      parts.push((y !== curY ? y + '年' : '') + m + '月' + halfLabel);
+      lastYM = ym;
+    }
+  });
+  return '👥 ' + parts.join('、');
+}
+
+/* =========================================================
+   かんばんボード
+========================================================= */
+var COLS = ['未定', '決定', '進行中', '完了'];
+var COL_COLORS = { '未定': '#aab2b8', '決定': '#1976d2', '進行中': '#e8a33d', '完了': '#4a7a9b' };
+
+function activeCases() {
+  return B.cases.filter(function(c) { return c['ステータス'] !== '完了'; });
+}
+function completedCases() {
+  return B.cases.filter(function(c) { return c['ステータス'] === '完了'; });
+}
+function applyFilters(list) {
+  var q = document.getElementById('q') ? document.getElementById('q').value.trim() : '';
+  return list.filter(function(c) {
+    if (filterClient && c['取引先'] !== filterClient) return false;
+    if (filterStaff && !(c['担当者'] || '').split(/[、,]/).map(function(s){return s.trim();}).filter(Boolean).some(function(s){return s === filterStaff;})) return false;
+    if (q && ((c['取引先'] || '') + (c['案件名'] || '') + (c['担当者'] || '')).indexOf(q) < 0) return false;
+    return true;
+  });
+}
+
+function hasUnchecked(c) {
+  var s = c['必要物チェック'] || '';
+  if (!s.trim()) return false;
+  return s.split(',').some(function(item) {
+    return item.trim() && item.trim().indexOf('[✓]') !== 0;
+  });
+}
+
+function cardHtml(c) {
+  var dateStr = c['正式日程'] ? c['正式日程'] : c['仮日程'];
+  var isKari = !c['正式日程'] && !!c['仮日程'];
+  var dateDisplay = isKari
+    ? (c['仮日程'].split(';').map(function(seg) {
+        seg = seg.trim(); if (!seg) return '';
+        var h = kariSegHalf(seg);
+        return h ? formatKariDisplay(seg) : formatDateDisplay(seg);
+      }).filter(Boolean).join('、'))
+    : formatDateDisplay(dateStr);
+  var chipsH = '';
+  if (c['区分'] === '出張') chipsH += '<span class="chip c-出張">出張</span>';
+  if (isKari && dateDisplay) chipsH += '<span class="chip c-kari">仮</span>';
+  if (c['添付フォルダURL']) chipsH += '<span class="chip c-attach">📎</span>';
+  if (hasUnchecked(c)) chipsH += '<span class="chip c-warn">必要物未完⚠</span>';
+
+  var metaH = '';
+  if (dateDisplay) metaH += '🗓 ' + esc(dateDisplay) + '<br>';
+  if (c['担当者']) metaH += '👤 ' + esc(c['担当者']);
+
+  var draggable = B.isAdmin ? ' draggable="true"' : '';
+  return '<div class="card"' + draggable + ' data-id="' + esc(c['案件ID']) + '" onclick="openCard(\'' + esc(c['案件ID']) + '\')">' +
+    '<div class="client">' + esc(c['取引先'] || '（取引先未設定）') + '</div>' +
+    '<div class="name">' + esc(c['案件名'] || '（案件名未設定）') + '</div>' +
+    (chipsH ? '<div class="chips">' + chipsH + '</div>' : '') +
+    (metaH ? '<div class="meta">' + metaH + '</div>' : '') +
+    '</div>';
+}
+
+function renderBoard() {
+  // ビュー切替トグル（タイムライン or かんばん）
+  var toggleH = '<div class="tl-view-toggle">' +
+    '<button class="tl-toggle-btn' + (boardSubView === 'timeline' ? ' on' : '') + '" onclick="setBoardSubView(\'timeline\')">📅 タイムライン</button>' +
+    '<button class="tl-toggle-btn' + (boardSubView === 'board' ? ' on' : '') + '" onclick="setBoardSubView(\'board\')">▦ ボード</button>' +
+    '</div>';
+
+  // タイムラインモードならtoolbar+タイムラインを返す
+  if (boardSubView === 'timeline') {
+    return toggleH + renderTimeline();
+  }
+
+  var list = applyFilters(activeCases());
+
+  // 絞り込みツールバー
+  var clients = B.clients || [];
+  var staff = B.staff || [];
+  var toolbar = '<div class="toolbar">取引先: <select class="fsort" onchange="filterClient=this.value;render()">' +
+    '<option value="">すべて</option>' + clients.map(function(c) {
+      return '<option' + (c === filterClient ? ' selected' : '') + '>' + esc(c) + '</option>';
+    }).join('') + '</select>' +
+    '&nbsp;担当: <select class="fsort" onchange="filterStaff=this.value;render()">' +
+    '<option value="">全員</option>' + staff.map(function(s) {
+      return '<option' + (s === filterStaff ? ' selected' : '') + '>' + esc(s) + '</option>';
+    }).join('') + '</select>' +
+    '<span class="cnt-info">表示中: ' + list.length + '件</span></div>';
+
+  var boardH = '<div class="board">';
+  var activeCols = ['未定', '決定', '進行中'];
+  activeCols.forEach(function(col) {
+    var cards = list.filter(function(c) { return c['ステータス'] === col; });
+    boardH += '<div class="col" data-col="' + esc(col) + '">' +
+      '<div class="col-head">' + esc(col) + ' <span class="cnt">' + cards.length + '</span></div>' +
+      cards.map(cardHtml).join('') + '</div>';
+  });
+
+  // 完了列（直近3件 + リンク）
+  var doneAll = applyFilters(completedCases());
+  var doneShow = doneAll.slice(-3).reverse();
+  boardH += '<div class="col" data-col="完了">' +
+    '<div class="col-head">完了 <span class="cnt">' + doneAll.length + '</span></div>' +
+    doneShow.map(cardHtml).join('') +
+    (doneAll.length > 3 ? '<a class="col-link" onclick="V=\'done\';render()">完了アーカイブを見る（' + doneAll.length + '件）</a>' : '') +
+    '</div>';
+
+  boardH += '</div>';
+  return toggleH + toolbar + boardH;
+}
+
+/* =========================================================
+   ビュー切替（タイムライン ↔ かんばん）
+========================================================= */
+function setBoardSubView(mode) {
+  boardSubView = mode;
+  try { localStorage.setItem('boardSubView', mode); } catch(e) {}
+  render();
+}
+
+/* =========================================================
+   タイムラインビュー（ガント式）
+========================================================= */
+
+// 仮日程メモからYYYY年M〜N月を解釈する
+// 対応形式: "2026年11月" / "2026年11〜3月" / "2026年11月〜2027年3月" / "2026年11〜12月" 等
+function parseMemoMonths(memo) {
+  if (!memo || !memo.trim()) return null;
+  // パターン1（優先）: YYYY年M月[〜~]YYYY年M月  → 年をまたぐ "2026年11月〜2027年3月"
+  var re1 = /(\d{4})年(\d{1,2})月[〜~](\d{4})年(\d{1,2})月/;
+  var m1 = memo.match(re1);
+  if (m1) {
+    var y1 = parseInt(m1[1],10), mo1 = parseInt(m1[2],10);
+    var y2 = parseInt(m1[3],10), mo2 = parseInt(m1[4],10);
+    if (mo1 >= 1 && mo1 <= 12 && mo2 >= 1 && mo2 <= 12) {
+      return { startY: y1, startM: mo1, endY: y2, endM: mo2 };
+    }
+  }
+  // パターン2: YYYY年M〜M月  → "2026年11〜3月" (同年内 or 年またぎ)
+  //         または YYYY年M月〜M月 → "2026年11月〜3月"
+  var re2 = /(\d{4})年(\d{1,2})月?[〜~](\d{1,2})月/;
+  var m2 = memo.match(re2);
+  if (m2) {
+    var y1b = parseInt(m2[1],10), mo1b = parseInt(m2[2],10), mo2b = parseInt(m2[3],10);
+    if (mo1b >= 1 && mo1b <= 12 && mo2b >= 1 && mo2b <= 12) {
+      var y2b = mo2b < mo1b ? y1b + 1 : y1b;
+      return { startY: y1b, startM: mo1b, endY: y2b, endM: mo2b };
+    }
+  }
+  // パターン3: 単月 YYYY年M月
+  var re3 = /(\d{4})年(\d{1,2})月/;
+  var m3 = memo.match(re3);
+  if (m3) {
+    var y1c = parseInt(m3[1],10), mo1c = parseInt(m3[2],10);
+    if (mo1c >= 1 && mo1c <= 12) {
+      return { startY: y1c, startM: mo1c, endY: y1c, endM: mo1c };
+    }
+  }
+  return null;
+}
+
+// 案件の期間を決定する
+// 戻り値: { startY, startM, startD, endY, endM, endD, kind:'seishiki'|'kari'|'memo', label }  or null
+function getCasePeriod(c) {
+  // a. 正式日程
+  if (c['正式日程'] && c['正式日程'].trim()) {
+    var dates = parseDateStr(c['正式日程']);
+    if (dates.length) {
+      var sorted = dates.sort(function(a,b){return a-b;});
+      var s = sorted[0], e = sorted[sorted.length-1];
+      return { startY: s.getFullYear(), startM: s.getMonth()+1, startD: s.getDate(),
+               endY: e.getFullYear(), endM: e.getMonth()+1, endD: e.getDate(), kind: 'seishiki',
+               label: formatDateDisplay(c['正式日程']) };
+    }
+  }
+  // b. 仮日程（ピッカー）
+  if (c['仮日程'] && c['仮日程'].trim()) {
+    var dates2 = parseDateStr(c['仮日程']);
+    if (dates2.length) {
+      var sorted2 = dates2.sort(function(a,b){return a-b;});
+      var s2 = sorted2[0], e2 = sorted2[sorted2.length-1];
+      var kariLabel = c['仮日程'].split(';').map(function(seg) {
+        seg = seg.trim(); if (!seg) return '';
+        var h = kariSegHalf(seg);
+        if (h) return formatKariDisplay(seg);
+        return formatDateDisplay(seg);
+      }).filter(Boolean).join('、');
+      return { startY: s2.getFullYear(), startM: s2.getMonth()+1, startD: s2.getDate(),
+               endY: e2.getFullYear(), endM: e2.getMonth()+1, endD: e2.getDate(), kind: 'kari',
+               label: '仮: ' + kariLabel };
+    }
+  }
+  // c. 仮日程メモのregex解釈
+  var memo = c['仮日程メモ'] || '';
+  if (!memo) memo = c['メモ'] || '';
+  var memoResult = parseMemoMonths(memo);
+  if (memoResult) {
+    return { startY: memoResult.startY, startM: memoResult.startM,
+             endY: memoResult.endY, endM: memoResult.endM, kind: 'memo',
+             label: 'メモ: ' + memoResult.startY + '年' + memoResult.startM + '月〜' + memoResult.endY + '年' + memoResult.endM + '月' };
+  }
+  return null;
+}
+
+// 表示する月リストを生成（当月 〜 当月+14）
+// 当月開始に変更（バッチ3・2026-10-13）: 月が替わると過去月は自動で表示から外れる
+function buildMonthList() {
+  var now = new Date();
+  var months = [];
+  var y = now.getFullYear(), m = now.getMonth() + 1;
+  for (var i = 0; i < 15; i++) {
+    months.push({ y: y, m: m });
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return months;
+}
+
+// 半月リストを生成（当月 〜 当月+14ヶ月 = 15ヶ月 = 30列）
+// 当月開始に変更（バッチ3・2026-10-13）
+function buildHalfMonthList() {
+  var now = new Date();
+  var halves = [];
+  var y = now.getFullYear(), m = now.getMonth() + 1;
+  for (var i = 0; i < 15; i++) {
+    halves.push({ y: y, m: m, h: 'zen' });  // 前半
+    halves.push({ y: y, m: m, h: 'go'  });  // 後半
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return halves;  // 30エントリ
+}
+
+// 半月インデックスを取得
+function halfMonthIndex(halves, y, m, h) {
+  for (var i = 0; i < halves.length; i++) {
+    if (halves[i].y === y && halves[i].m === m && halves[i].h === h) return i;
+  }
+  return -1;
+}
+
+// 開始日から半月('zen'|'go')を決定
+function dayToHalf(d) { return d <= 15 ? 'zen' : 'go'; }
+
+// 月インデックスを取得 (months配列内の位置)
+function monthIndex(months, y, m) {
+  for (var i = 0; i < months.length; i++) {
+    if (months[i].y === y && months[i].m === m) return i;
+  }
+  return -1;
+}
+
+function renderTimeline() {
+  var now = new Date();
+  var curY = now.getFullYear(), curM = now.getMonth() + 1;
+  var halves = buildHalfMonthList();  // 30列（当月〜+14ヶ月）
+  var totalCols = halves.length;
+
+  // 表示対象
+  var targetList = applyFilters(activeCases());
+  if (tlShowDone) targetList = applyFilters(B.cases);
+
+  // 絞り込みツールバー
+  var clients = B.clients || [];
+  var staff = B.staff || [];
+  var toolbar = '<div class="toolbar">取引先: <select class="fsort" onchange="filterClient=this.value;render()">' +
+    '<option value="">すべて</option>' + clients.map(function(c) {
+      return '<option' + (c === filterClient ? ' selected' : '') + '>' + esc(c) + '</option>';
+    }).join('') + '</select>' +
+    '&nbsp;担当: <select class="fsort" onchange="filterStaff=this.value;render()">' +
+    '<option value="">全員</option>' + staff.map(function(s) {
+      return '<option' + (s === filterStaff ? ' selected' : '') + '>' + esc(s) + '</option>';
+    }).join('') + '</select>' +
+    '<span class="tl-show-done-wrap"><input type="checkbox" id="tlDoneChk"' + (tlShowDone ? ' checked' : '') +
+    ' onchange="tlShowDone=this.checked;render()"><label for="tlDoneChk">完了も表示</label></span>' +
+    '<span class="cnt-info">表示中: ' + targetList.length + '件</span></div>';
+
+  // 案件をperiod付きに変換
+  var rows = [];
+  var undated = [];
+  targetList.forEach(function(c) {
+    var p = getCasePeriod(c);
+    if (!p) { undated.push(c); return; }
+    rows.push({ c: c, p: p });
+  });
+
+  // ソート
+  rows.sort(function(a, b) {
+    var aKey = a.p.startY * 10000 + a.p.startM * 100 + (a.p.startD || 1);
+    var bKey = b.p.startY * 10000 + b.p.startM * 100 + (b.p.startD || 1);
+    return aKey - bKey;
+  });
+
+  // テーブルヘッダー（2段: 上段=月colspan2、下段=前半/後半）
+  var headRow1 = '<tr><th class="tl-head-name" rowspan="2">案件名</th>';
+  var headRow2 = '<tr>';
+  for (var i = 0; i < halves.length; i++) {
+    var hv = halves[i];
+    var isCurMonth = (hv.y === curY && hv.m === curM);
+    if (hv.h === 'zen') {
+      var mLabel = hv.y + '/' + String(hv.m).padStart(2, '0');
+      headRow1 += '<th class="tl-head-month' + (isCurMonth ? ' cur-month' : '') + '" colspan="2" style="text-align:center">' + mLabel + '</th>';
+    }
+    headRow2 += '<th class="tl-head-half' + (isCurMonth ? ' cur-month' : '') + '">' + (hv.h === 'zen' ? '前' : '後') + '</th>';
+  }
+  headRow1 += '</tr>';
+  headRow2 += '</tr>';
+
+  // 各案件行を生成
+  var bodyH = '';
+  rows.forEach(function(row) {
+    var c = row.c, p = row.p;
+    var label = c['取引先'] ? (c['取引先'] + '｜' + (c['案件名'] || '')) : (c['案件名'] || '');
+    var status = c['ステータス'] || '未定';
+
+    var startD = p.startD || 1;
+    var endY = p.endY, endM = p.endM;
+    var endD = p.endD || new Date(endY, endM, 0).getDate();
+
+    // 半月スナップ
+    var startHalf = dayToHalf(startD);
+    var endHalf = dayToHalf(endD);
+
+    var startIdx = halfMonthIndex(halves, p.startY, p.startM, startHalf);
+    var endIdx   = halfMonthIndex(halves, endY, endM, endHalf);
+
+    // 範囲外クリップ
+    if (startIdx < 0) {
+      var startKey = p.startY * 10000 + p.startM * 100;
+      startIdx = startKey > (halves[totalCols-1].y * 10000 + halves[totalCols-1].m * 100) ? totalCols : 0;
+    }
+    if (endIdx < 0) {
+      var endKey = endY * 10000 + endM * 100;
+      endIdx = endKey < (halves[0].y * 10000 + halves[0].m * 100) ? -1 : totalCols - 1;
+    }
+
+    var isKari = (p.kind === 'kari' || p.kind === 'memo');
+    var barClass = 'tl-bar st-' + status + (isKari ? ' kari' : '');
+    var titleAttr = esc((c['案件名'] || '') + ' / ' + p.label + ' / ' + status);
+
+    // 期間別人数（半月ごと）。該当半月に指定がなければ必要人数を適用。どちらも無ければ非表示
+    var ninzuMap = parseKikanClient(c['期間別人数'] || '');
+    var baseNinzuStr = String(c['必要人数'] || '').trim();
+    var baseNinzu = /^\d{1,2}$/.test(baseNinzuStr) ? parseInt(baseNinzuStr, 10) : null;
+
+    var cellsH = '';
+    halves.forEach(function(hv, colIdx) {
+      var isCurMonth = (hv.y === curY && hv.m === curM);
+      var cellClass = 'tl-cell' + (isCurMonth ? ' cur-month' : '');
+
+      if (colIdx < startIdx || colIdx > endIdx) {
+        cellsH += '<td class="' + cellClass + '"><div class="tl-bar-wrap"></div></td>';
+        return;
+      }
+
+      var hvKey = hv.y + '-' + String(hv.m).padStart(2, '0') + (hv.h === 'zen' ? '前' : '後');
+      var n = (ninzuMap[hvKey] != null) ? ninzuMap[hvKey] : baseNinzu;
+      var ninzuHtml = '';
+      if (n != null) {
+        var ninzuTitle = (hv.y !== curY ? hv.y + '年' : '') + hv.m + '月' + (hv.h === 'zen' ? '前半' : '後半') + ' ' + n + '名';
+        ninzuHtml = '<span class="tl-ninzu" title="' + ninzuTitle + '">' + n + '</span>';
+      }
+
+      var barName = (colIdx === startIdx) ? esc(c['案件名'] || '') : '';
+      var widthPct = (colIdx === startIdx && colIdx === endIdx) ? 90 : 100;
+      cellsH += '<td class="' + cellClass + '">' +
+        '<div class="tl-bar-wrap">' +
+        '<div class="' + barClass + '" style="left:0%;width:' + widthPct + '%"' +
+        ' title="' + titleAttr + '"' +
+        ' onclick="openCard(\'' + esc(c['案件ID']) + '\')">' +
+        barName + ninzuHtml + '</div></div></td>';
+    });
+
+    bodyH += '<tr>' +
+      '<td class="tl-name-col" onclick="openCard(\'' + esc(c['案件ID']) + '\')" title="' + esc(label) + '">' + esc(label) + '</td>' +
+      cellsH + '</tr>';
+  });
+
+  // 時期未定セクション
+  var undatedH = '';
+  if (undated.length) {
+    undatedH = '<div class="tl-undated"><div class="tl-undated-title">⋯ 時期未定（' + undated.length + '件）</div><div class="tl-undated-chips">' +
+      undated.map(function(c) {
+        var n = c['取引先'] ? (c['取引先'] + '｜' + (c['案件名'] || '')) : (c['案件名'] || '');
+        return '<span class="tl-undated-chip" onclick="openCard(\'' + esc(c['案件ID']) + '\')">' + esc(n) + '</span>';
+      }).join('') +
+      '</div></div>';
+  }
+
+  var tableH = '<div class="tl-outer">' +
+    '<div class="tl-scroll-wrap">' +
+    '<table class="tl-table">' + headRow1 + headRow2 + bodyH + '</table>' +
+    '</div>' + undatedH + '</div>';
+
+  return toolbar + tableH;
+}
+
+function renderDone() {
+  var list = applyFilters(completedCases());
+  if (!list.length) return '<div class="empty">完了案件はありません</div>';
+  return '<div class="board" style="flex-wrap:wrap">' + list.reverse().map(function(c) {
+    return '<div class="card" style="width:220px" onclick="openCard(\'' + esc(c['案件ID']) + '\')">'+
+      '<div class="client">' + esc(c['取引先'] || '') + '</div>'+
+      '<div class="name">' + esc(c['案件名'] || '') + '</div>'+
+      '<div class="meta">担当: ' + esc(c['担当者'] || '—') + '</div>'+
+      '</div>';
+  }).join('') + '</div>';
+}
+
+function renderSearch() {
+  var q = document.getElementById('q') ? document.getElementById('q').value.trim() : '';
+  if (!q) return '<div class="empty">上の検索バーにキーワードを入力してください</div>';
+  var list = B.cases.filter(function(c) {
+    return ((c['取引先'] || '') + (c['案件名'] || '') + (c['担当者'] || '') + (c['現場住所'] || '') + (c['メモ'] || '')).indexOf(q) >= 0;
+  });
+  if (!list.length) return '<div class="empty">「' + esc(q) + '」に一致する案件はありません</div>';
+  var rows = list.map(function(c) {
+    return '<tr onclick="openCard(\'' + esc(c['案件ID']) + '\')">' +
+      '<td>' + esc(c['取引先'] || '') + '</td>' +
+      '<td><b>' + esc(c['案件名'] || '') + '</b></td>' +
+      '<td>' + esc(c['ステータス'] || '') + '</td>' +
+      '<td>' + esc(formatDateDisplay(c['正式日程'] || c['仮日程'])) + '</td>' +
+      '<td>' + esc(c['担当者'] || '') + '</td>' +
+      '</tr>';
+  }).join('');
+  return '<div class="tbl-wrap"><table class="lt"><tr><th>取引先</th><th>案件名</th><th>状態</th><th>日程</th><th>担当者</th></tr>' + rows + '</table></div>';
+}
+
+function renderTrashView(data) {
+  if (!data || !data.length) return '<div class="empty">ゴミ箱は空です（削除から30日で自動消去）</div>';
+  var rows = data.map(function(c) {
+    return '<tr>' +
+      '<td>' + esc(c['取引先'] || '') + '</td>' +
+      '<td>' + esc(c['案件名'] || '') + '</td>' +
+      '<td>' + esc(c['削除日'] || '') + '</td>' +
+      '<td><span class="chipbtn" onclick="restoreCase(\'' + esc(c['案件ID']) + '\')">↩ 復元</span></td>' +
+      '</tr>';
+  }).join('');
+  return '<div class="tbl-wrap"><table class="lt"><tr><th>取引先</th><th>案件名</th><th>削除日</th><th></th></tr>' + rows + '</table></div>';
+}
+
+function renderLogView(data) {
+  if (!data || !data.length) return '<div class="empty">操作ログはありません</div>';
+  var rows = data.map(function(r) {
+    var keys = Object.keys(r);
+    return '<tr>' + keys.map(function(k) { return '<td>' + esc(r[k]) + '</td>'; }).join('') + '</tr>';
+  }).join('');
+  var headers = Object.keys(data[0]).map(function(k) { return '<th>' + esc(k) + '</th>'; }).join('');
+  return '<div class="tbl-wrap"><table class="lt"><tr>' + headers + '</tr>' + rows + '</table></div>';
+}
+
+/* =========================================================
+   render()
+========================================================= */
+function render() {
+  var nav = document.getElementById('navBar');
+  nav.querySelectorAll('a').forEach(function(a) { a.classList.toggle('active', a.dataset.v === V); });
+  var el = document.getElementById('view');
+  if (V === 'board') { el.innerHTML = renderBoard(); bindDrag(); }
+  else if (V === 'done') { el.innerHTML = renderDone(); }
+  else if (V === 'search') { el.innerHTML = renderSearch(); }
+  else if (V === 'haisha') { renderHaisha(); }
+  else if (V === 'haichi') { renderHaichi(); }
+  else if (V === 'gaichu') { renderGaichu(); }
+  else if (V === 'sched') { renderSched(); }
+  else if (V === 'kyuyo') { renderKyuyo(); }
+  else if (V === 'zairyo') { renderZairyoHokoku(); }
+  else if (V === 'keihi') { renderKeihi(); }
+  else if (V === 'keihiadmin') { renderKeihiApproval(); }
+  else if (V === 'log') {
+    el.innerHTML = '<div class="empty">読み込み中...</div>';
+    run('api_getOperationLog', [TOKEN], function(data) { if (V === 'log') document.getElementById('view').innerHTML = renderLogView(data); });
+  }
+  else if (V === 'trash') {
+    if (trashCache) { el.innerHTML = renderTrashView(trashCache); }
+    else {
+      el.innerHTML = '<div class="empty">読み込み中...</div>';
+      run('api_getTrash', [TOKEN], function(data) { trashCache = data; if (V === 'trash') document.getElementById('view').innerHTML = renderTrashView(data); });
+    }
+  }
+  else if (V === 'linelink') {
+    el.innerHTML = '<div class="empty">読み込み中...</div>';
+    run('api_lineGetLinks', [TOKEN], function(data) { if (V === 'linelink') document.getElementById('view').innerHTML = renderLineLinkView(data); });
+  }
+}
+
+/* =========================================================
+   ドラッグ&ドロップ（管理者のみ）
+========================================================= */
+function bindDrag() {
+  if (!B.isAdmin) return;
+  document.querySelectorAll('.card[draggable]').forEach(function(el) {
+    el.addEventListener('dragstart', function(e) { e.dataTransfer.setData('text/plain', el.dataset.id); });
+  });
+  document.querySelectorAll('.col').forEach(function(col) {
+    col.addEventListener('dragover', function(e) { e.preventDefault(); col.classList.add('dragover'); });
+    col.addEventListener('dragleave', function() { col.classList.remove('dragover'); });
+    col.addEventListener('drop', function(e) {
+      e.preventDefault(); col.classList.remove('dragover');
+      var id = e.dataTransfer.getData('text/plain');
+      var to = col.dataset.col;
+      localPatch(id, { 'ステータス': to });
+      toast('ステータスを「' + to + '」へ移動しました');
+      render();
+      runBg('api_updateCase', [TOKEN, id, { 'ステータス': to }]);
+    });
+  });
+}
+function localPatch(id, patch) {
+  var c = B.cases.filter(function(x) { return x['案件ID'] === id; })[0];
+  if (!c) return;
+  Object.keys(patch).forEach(function(k) { c[k] = patch[k]; });
+}
+
+/* =========================================================
+   カード詳細（閲覧ファースト・2026-10-12 CEO指示）
+   タップ → 閲覧専用の詳細画面（入力欄なし）
+   → 管理者のみ右上「✏️ 編集」→ 従来の編集モーダル（openCardEdit）
+   添付アップロード・チェックボックスは従来どおり社員も閲覧画面から操作可
+========================================================= */
+
+/** 必要物チェックリストHTML（閲覧・編集画面で共通。チェック操作は社員も可） */
+function checklistHtml(c, id) {
+  var checkItems = (c['必要物チェック'] || '').split(',').filter(function(s) { return s.trim(); });
+  if (!checkItems.length) return '<div style="font-size:11px;color:#99a">必要物リストはありません</div>';
+  return '<ul class="checklist" id="checklist">' + checkItems.map(function(item, i) {
+    item = item.trim();
+    var checked = item.indexOf('[✓]') === 0;
+    var label = checked ? item.slice(3) : item;
+    return '<li><input type="checkbox" ' + (checked ? 'checked' : '') +
+      ' onchange="updateCheck(\'' + esc(id) + '\',' + i + ',this.checked)"><span>' + esc(label) + '</span></li>';
+  }).join('') + '</ul>';
+}
+
+/** 添付資料セクション（一覧＋タグ選択＋アップロード）HTML。閲覧・編集画面で共通の部品 */
+function filesSecHtml(c, id) {
+  return '<div class="sec"><h4>📎 添付資料</h4>' +
+    '<div id="files">読み込み中...</div>' +
+    '<div class="tag-sel" style="margin-bottom:6px"><select id="fileTag">' +
+    ['図面', '名簿', '作業届', '材料表', '工程表', '現場案内', '写真', '材料写真', 'その他'].map(function(t) { return '<option>' + t + '</option>'; }).join('') +
+    '</select></div>' +
+    '<div class="upload-zone" id="dropZone" onclick="document.getElementById(\'fi\').click()" ' +
+    'ondragover="event.preventDefault();this.classList.add(\'drag\')" ' +
+    'ondragleave="this.classList.remove(\'drag\')" ' +
+    'ondrop="handleDrop(event,\'' + esc(id) + '\',\'' + esc(c['案件名'] || '') + '\')">'+
+    '＋ ファイルを選択 または ここにドロップ</div>' +
+    '<input type="file" id="fi" style="display:none" accept="application/pdf,image/*,.xlsx,.docx" onchange="uploadFile(\'' + esc(id) + '\',\'' + esc(c['案件名'] || '') + '\')"></div>';
+}
+
+/** 右ペイン（必要物チェック＋添付）HTML。編集画面で使用 */
+function cardRightHtml(c, id) {
+  return '<div class="sec"><h4>必要物チェック</h4>' + checklistHtml(c, id) + '</div>' +
+    filesSecHtml(c, id);
+}
+
+/** 添付一覧の読み込み（閲覧・編集画面で共通） */
+function loadCardFiles(id) {
+  run('api_getFiles', [TOKEN, id], function(fs) {
+    var el = document.getElementById('files');
+    if (el) el.innerHTML = filesHtml(fs, id, B.isAdmin);
+  });
+}
+
+/** 閲覧専用の案件詳細画面（カードタップの入口） */
+function openCard(id) {
+  event && event.stopPropagation();
+  var c = B.cases.filter(function(x) { return x['案件ID'] === id; })[0];
+  if (!c) return;
+
+  var row = function(label, val, rawHtml) {
+    if (val == null || String(val).trim() === '') return '';
+    return '<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid #f2f4f6;font-size:12.5px">' +
+      '<div style="width:112px;flex-shrink:0;color:#8895a2;font-size:11px;padding-top:1px">' + label + '</div>' +
+      '<div style="flex:1;color:#223;word-break:break-word;white-space:pre-wrap">' + (rawHtml ? val : esc(val)) + '</div></div>';
+  };
+
+  var kariDisp = (c['仮日程'] || '').split(';').map(function(seg) {
+    seg = seg.trim(); if (!seg) return '';
+    var h = kariSegHalf(seg);
+    return h ? formatKariDisplay(seg) : formatDateDisplay(seg);
+  }).filter(Boolean).join('、');
+
+  var addr = (c['現場住所'] || '').trim();
+  var addrHtml = addr
+    ? esc(addr) + ' <a class="addr-link" target="_blank" href="https://maps.google.com/?q=' + encodeURIComponent(addr) + '">🗺 地図</a>'
+    : '';
+
+  var leftH =
+    '<div class="sec"><h4>基本情報</h4>' +
+    row('取引先', c['取引先']) +
+    row('案件名', c['案件名']) +
+    row('ステータス', c['ステータス']) +
+    row('区分', c['区分']) +
+    row('現場住所', addrHtml, true) +
+    row('集合場所・入場時間', c['集合場所・入場時間']) +
+    '</div>' +
+    '<div class="sec"><h4>日程</h4>' +
+    row('正式日程', formatDateDisplay(c['正式日程'] || '')) +
+    row('仮日程', kariDisp) +
+    row('仮日程メモ', c['仮日程メモ']) +
+    '</div>' +
+    '<div class="sec"><h4>担当・その他</h4>' +
+    row('担当者', c['担当者']) +
+    row('必要人数', c['必要人数']) +
+    row('期間別人数', kikanNinzuDisplay(c['期間別人数'] || '')) +
+    row('連休工事タグ', c['連休工事タグ']) +
+    row('見積番号', c['見積番号']) +
+    row('注文書番号', c['注文書番号']) +
+    row('元請担当者', c['元請担当者']) +
+    row('連絡先', c['連絡先']) +
+    row('メモ', c['メモ']) +
+    row('更新日', c['更新日']) +
+    '</div>';
+
+  var editBtn = B.isAdmin
+    ? '<button onclick="openCardEdit(\'' + esc(id) + '\')" ' +
+      'style="background:#fff;color:#1565c0;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:bold;cursor:pointer;white-space:nowrap">✏️ 編集</button>'
+    : '';
+
+  // 閲覧画面は1カラム構成: 最上部=添付資料（現場で開いた瞬間に図面・作業届へ届く動線）
+  // → 必要物チェック → 基本情報・日程・担当（バッチ3・2026-10-13）
+  var html = '<div class="mhead">' +
+    '<h2>' + esc(c['取引先'] || '') + '　' + esc(c['案件名'] || '') + '</h2>' +
+    editBtn +
+    '<span class="close" onclick="closeModal()">✕</span>' +
+    '</div>' +
+    '<div class="mbody"><div class="mleft" style="border-right:none">' +
+    filesSecHtml(c, id) +
+    '<div class="sec"><h4>必要物チェック</h4>' + checklistHtml(c, id) + '</div>' +
+    leftH + '</div></div>';
+
+  document.getElementById('modal').innerHTML = html;
+  document.getElementById('ov').style.display = 'block';
+  loadCardFiles(id);
+}
+
+/* =========================================================
+   カード編集モーダル（従来実装・管理者のみ「✏️ 編集」から開く）
+========================================================= */
+function openCardEdit(id) {
+  var c = B.cases.filter(function(x) { return x['案件ID'] === id; })[0];
+  if (!c || !B.isAdmin) return;
+
+  var canEdit = B.isAdmin;
+  var ro = canEdit ? '' : ' readonly disabled';
+  var roSel = canEdit ? '' : ' disabled';
+
+  var statusOpts = COLS.map(function(s) {
+    return '<option' + (s === c['ステータス'] ? ' selected' : '') + '>' + esc(s) + '</option>';
+  }).join('');
+  var kubunOpts = ['出張', '地場'].map(function(s) {
+    return '<option' + (s === c['区分'] ? ' selected' : '') + '>' + esc(s) + '</option>';
+  }).join('');
+  var clientOpts = [''].concat(B.clients).map(function(s) {
+    return '<option' + (s === c['取引先'] ? ' selected' : '') + '>' + esc(s) + '</option>';
+  }).join('');
+  var staffOpts = [''].concat(B.staff).map(function(s) {
+    return '<option' + (s === c['担当者'] ? ' selected' : '') + '>' + esc(s) + '</option>';
+  }).join('');
+
+  var fld = function(label, key, type) {
+    type = type || 'text';
+    return '<label><span>' + label + '</span><input data-k="' + key + '" type="' + type + '" value="' + esc(c[key] || '') + '"' + ro + '></label>';
+  };
+
+  var leftH = '<div class="sec"><h4>基本情報</h4><div class="frm" id="frm">' +
+    '<label><span>取引先</span>' + (canEdit
+      ? '<input data-k="取引先" list="clientList" value="' + esc(c['取引先'] || '') + '"><datalist id="clientList">' + (B.clients || []).map(function(v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist>'
+      : '<input data-k="取引先" value="' + esc(c['取引先'] || '') + '" readonly disabled>') +
+    '</label>' +
+    '<label><span>案件名</span><input data-k="案件名" value="' + esc(c['案件名'] || '') + '"' + ro + '></label>' +
+    '<label><span>ステータス</span><select data-k="ステータス"' + roSel + '>' + statusOpts + '</select></label>' +
+    '<label><span>区分</span><select data-k="区分"' + roSel + '>' + kubunOpts + '</select></label>' +
+    '<label class="w100"><span>現場住所</span>' +
+      '<input data-k="現場住所" id="addrInput" value="' + esc(c['現場住所'] || '') + '"' + ro + '>' +
+      (c['現場住所'] ? '<a class="addr-link" onclick="openMap()">🗺 地図を開く</a>' : '') +
+    '</label>' +
+    fld('集合場所・入場時間', '集合場所・入場時間') +
+    '</div></div>';
+
+  leftH += '<div class="sec"><h4>仮日程</h4>' +
+    renderPickerHtml('kari', c['仮日程'] || '') +
+    '<label style="font-size:11px;color:#8895a2;margin-top:4px">仮日程メモ</label>' +
+    '<textarea data-k="仮日程メモ" rows="1" style="width:100%;border:1px solid #dfe4e8;border-radius:7px;padding:5px 8px;font-size:12px;color:#223;resize:vertical"' + ro + '>' + esc(c['仮日程メモ'] || '') + '</textarea>' +
+    '</div>';
+
+  leftH += '<div class="sec"><h4>正式日程</h4>' +
+    renderPickerHtml('seishiki', c['正式日程'] || '') +
+    (canEdit ? '<button class="btn promo" style="margin-top:6px" onclick="promoteDate()">仮日程を正式日程へ昇格</button>' : '') +
+    '</div>';
+
+  leftH += '<div class="sec"><div class="frm" id="frm2">' +
+    '<label><span>担当者</span>' + (canEdit
+      ? '<input data-k="担当者" list="staffList" value="' + esc(c['担当者'] || '') + '"><datalist id="staffList">' + (B.staff || []).map(function(v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist>'
+      : '<input data-k="担当者" value="' + esc(c['担当者'] || '') + '" readonly disabled>') +
+    '</label>' +
+    '<label><span>必要人数</span><input data-k="必要人数" type="number" value="' + esc(c['必要人数'] || '') + '"' + ro + '></label>' +
+    '<div class="w100"><span style="font-size:10.5px;color:#8895a2">期間別人数（半月ごと・空欄はその半月に必要人数を適用）</span>' +
+    '<div id="kikanWrap" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div></div>' +
+    '<label><span>連休工事タグ</span><input data-k="連休工事タグ" value="' + esc(c['連休工事タグ'] || '') + '"' + ro + '></label>' +
+    '<label><span>見積番号</span><input data-k="見積番号" value="' + esc(c['見積番号'] || '') + '"' + ro + '></label>' +
+    '<label><span>注文書番号</span><input data-k="注文書番号" value="' + esc(c['注文書番号'] || '') + '"' + ro + '></label>' +
+    '<label><span>元請担当者</span><input data-k="元請担当者" value="' + esc(c['元請担当者'] || '') + '"' + ro + '></label>' +
+    '<label><span>連絡先</span><input data-k="連絡先" value="' + esc(c['連絡先'] || '') + '"' + ro + '></label>' +
+    '<label class="w100"><span>メモ</span><textarea data-k="メモ" rows="3"' + ro + '>' + esc(c['メモ'] || '') + '</textarea></label>' +
+    '</div></div>';
+
+  leftH += '<div class="btns">' +
+    (canEdit ? '<button class="btn save" onclick="saveCard(\'' + esc(id) + '\')">保存</button>' : '') +
+    (canEdit
+      ? '<button class="btn schedule" onclick="reflectSchedule(\'' + esc(id) + '\')">📅 スケジュールへ反映</button>'
+      : '') +
+    (canEdit ? '<button class="btn del" onclick="delCard(\'' + esc(id) + '\')">🗑 削除</button>' : '') +
+    '</div>';
+
+  // 右ペイン（社員も操作可・閲覧画面と共通）
+  var rightH = cardRightHtml(c, id);
+
+  var html = '<div class="mhead">' +
+    '<h2>' + esc(c['取引先'] || '') + '　' + esc(c['案件名'] || '') + '</h2>' +
+    '<span class="close" onclick="closeModal()">✕</span>' +
+    '</div>' +
+    '<div class="mbody"><div class="mleft">' + leftH + '</div>' +
+    '<div class="mright">' + rightH + '</div></div>';
+
+  document.getElementById('modal').innerHTML = html;
+  document.getElementById('ov').style.display = 'block';
+
+  // 期間別人数の既存値をロードしてからピッカーを初期化（ピッカー描画時にマスも追従生成される）
+  KIKAN_STATE = parseKikanClient(c['期間別人数'] || '');
+  initPicker('kari', c['仮日程'] || '');
+  initPicker('seishiki', c['正式日程'] || '');
+  renderKikanInputs();
+
+  loadCardFiles(id);
+
+  // 現住所リンク動的更新
+  document.getElementById('addrInput') && document.getElementById('addrInput').addEventListener('input', function() {
+    var v = this.value.trim();
+    var container = this.parentNode;
+    var existing = container.querySelector('.addr-link');
+    if (v) {
+      if (!existing) {
+        var a = document.createElement('a');
+        a.className = 'addr-link'; a.textContent = '🗺 地図を開く'; a.onclick = openMap;
+        container.appendChild(a);
+      }
+    } else {
+      existing && existing.remove();
+    }
+  });
+}
+
+function openMap() {
+  var addr = document.getElementById('addrInput');
+  if (addr && addr.value.trim()) window.open('https://maps.google.com/?q=' + encodeURIComponent(addr.value.trim()), '_blank');
+}
+function closeModal() { document.getElementById('ov').style.display = 'none'; render(); }
+document.getElementById('ov').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+
+function collectPatch(id) {
+  var p = {};
+  document.querySelectorAll('#frm [data-k], #frm2 [data-k]').forEach(function(el) { p[el.dataset.k] = el.value; });
+  var kariP = PICKERS['kari'];
+  p['仮日程'] = kariP ? (kariP.isKari ? serializeKariSegs(kariMergeSegs(kariP.segs)) : serializeDates(kariP.dates)) : '';
+  p['正式日程'] = serializeDates(PICKERS['seishiki'] ? PICKERS['seishiki'].dates : []);
+  // 期間別人数: 表示中の半月マスのみ収集（日程から外れた半月は破棄）。空欄は保存しない
+  var kikanWrap = document.getElementById('kikanWrap');
+  if (kikanWrap) {
+    var kikanParts = [];
+    kikanWrap.querySelectorAll('input[data-kk]').forEach(function(el) {
+      var v = el.value.trim();
+      if (v === '') return;
+      var n = parseInt(v, 10);
+      if (isNaN(n) || n < 0) return;
+      if (n > 99) n = 99;
+      kikanParts.push(el.dataset.kk + ':' + n);
+    });
+    p['期間別人数'] = kikanParts.sort().join(';');
+  }
+  return p;
+}
+
+/* =========================================================
+   期間別人数の編集UI（半月ごとの入力マス・バッチ3 2026-10-13）
+   正式日程（なければ仮日程）が掛かる半月ごとに数値マスを自動生成。
+   日程を変えるとピッカー再描画のフックでマスも追従する
+========================================================= */
+var KIKAN_STATE = {};  // 半月キー → 入力値（編集モーダルを開くたびに初期化）
+
+// 正式日程（なければ仮日程）が掛かる半月キー一覧（'YYYY-MM前'|'YYYY-MM後'・昇順）
+function kikanKeysFromPickers() {
+  var keys = [];
+  var seen = {};
+  function add(y, m, half) {
+    var k = y + '-' + String(m).padStart(2, '0') + half;
+    if (!seen[k]) { seen[k] = true; keys.push(k); }
+  }
+  function addDates(dates) {
+    (dates || []).forEach(function(d) {
+      add(d.getFullYear(), d.getMonth() + 1, d.getDate() <= 15 ? '前' : '後');
+    });
+  }
+  var sp = PICKERS['seishiki'];
+  if (sp && sp.dates && sp.dates.length) {
+    addDates(sp.dates);
+  } else {
+    var kp = PICKERS['kari'];
+    if (kp && kp.isKari) {
+      kariMergeSegs(kp.segs).forEach(function(seg) {
+        var h = kariSegHalf(seg);
+        var yr = Number(seg.slice(0, 4)), mo = Number(seg.slice(5, 7));
+        if (h === 'zen') add(yr, mo, '前');
+        else if (h === 'go') add(yr, mo, '後');
+        else if (h === 'all') { add(yr, mo, '前'); add(yr, mo, '後'); }
+      });
+    } else if (kp && kp.dates) {
+      addDates(kp.dates);
+    }
+  }
+  keys.sort();
+  return keys;
+}
+
+function renderKikanInputs() {
+  var wrap = document.getElementById('kikanWrap');
+  if (!wrap) return;
+  // 入力途中の値を退避（日程変更でマスが作り直されても消えないように）
+  wrap.querySelectorAll('input[data-kk]').forEach(function(el) {
+    var v = el.value.trim();
+    if (v === '') delete KIKAN_STATE[el.dataset.kk];
+    else KIKAN_STATE[el.dataset.kk] = v;
+  });
+  var keys = kikanKeysFromPickers();
+  if (!keys.length) {
+    wrap.innerHTML = '<span style="font-size:11px;color:#99a">日程（正式日程・なければ仮日程）を設定すると半月ごとの入力マスが表示されます</span>';
+    return;
+  }
+  var curY = new Date().getFullYear();
+  wrap.innerHTML = keys.map(function(k) {
+    var y = Number(k.slice(0, 4)), m = Number(k.slice(5, 7)), half = k.slice(7);
+    var label = (y !== curY ? y + '年' : '') + m + '月' + (half === '前' ? '前半' : '後半');
+    var val = KIKAN_STATE[k] != null ? KIKAN_STATE[k] : '';
+    return '<label style="display:flex;align-items:center;gap:3px;font-size:11.5px;color:#445;white-space:nowrap">' + esc(label) +
+      '<input type="number" min="0" max="99" data-kk="' + esc(k) + '" value="' + esc(val) + '"' +
+      ' style="width:52px;border:1px solid #dfe4e8;border-radius:6px;padding:4px 5px;font-size:12px"></label>';
+  }).join('');
+}
+
+// ピッカー再描画のたびに呼ぶ（編集モーダル以外ではkikanWrapが無いため何もしない）
+function kikanMaybeRender(pid) {
+  if ((pid === 'kari' || pid === 'seishiki') && document.getElementById('kikanWrap')) renderKikanInputs();
+}
+
+function saveCard(id) {
+  var p = collectPatch(id);
+  var clientVal = (p['取引先'] || '').trim();
+  if (clientVal && B.clients.indexOf(clientVal) < 0) B.clients.push(clientVal);
+  var staffVal = (p['担当者'] || '').trim();
+  if (staffVal && B.staff.indexOf(staffVal) < 0) B.staff.push(staffVal);
+  localPatch(id, p);
+  toast('保存しました');
+  closeModal();
+  render();
+  runBg('api_updateCase', [TOKEN, id, p]);
+}
+
+function promoteDate() {
+  var kariP = PICKERS['kari'];
+  if (!kariP) return;
+  var kariDates = kariP.isKari ? kariSegsToDates(kariMergeSegs(kariP.segs)) : kariP.dates;
+  if (!kariDates.length) { toast('仮日程が設定されていません'); return; }
+  if (!PICKERS['seishiki']) return;
+  PICKERS['seishiki'].dates = kariDates.slice();
+  renderPickerUI('seishiki');
+  toast('仮日程を正式日程へコピーしました（保存ボタンで確定）');
+}
+
+function delCard(id) {
+  var c = B.cases.filter(function(x) { return x['案件ID'] === id; })[0];
+  var name = c ? (c['案件名'] || id) : id;
+  // まずサーバー削除が成功してからローカル除去＆Undoトーストを表示（非同期競合防止）
+  document.getElementById('ov').style.display = 'none';
+  run('api_toTrash', [TOKEN, id], function() {
+    B.cases = B.cases.filter(function(x) { return x['案件ID'] !== id; });
+    trashCache = null;
+    render();
+    toastUndo('「' + name + '」を削除しました', function() {
+      run('api_restore', [TOKEN, id], function() { reload(function() { toast('復元しました'); }); });
+    });
+  });
+}
+
+function restoreCase(id) {
+  run('api_restore', [TOKEN, id], function() { toast('復元しました'); trashCache = null; reload(); });
+}
+
+/* =========================================================
+   スケジュール反映（Phase 4）
+========================================================= */
+function reflectSchedule(id) {
+  var c = B.cases.filter(function(x) { return x['案件ID'] === id; })[0];
+  if (!c) return;
+
+  // 正式日程が設定されているか確認
+  if (!c['正式日程']) {
+    toast('正式日程が設定されていません。設定してから反映してください。');
+    return;
+  }
+
+  // 確認ダイアログ
+  var dateDisplay = formatDateDisplay(c['正式日程']);
+  var msg = '【スケジュール反映確認】\n\n' +
+    '取引先: ' + (c['取引先'] || '（未設定）') + '\n' +
+    '案件名: ' + (c['案件名'] || '（未設定）') + '\n' +
+    '正式日程: ' + dateDisplay + '\n' +
+    '区分: ' + (c['区分'] || '地場') + '\n\n' +
+    '配置スケジュールスプシへ反映します。\n' +
+    '・名前・背景色は変更しません\n' +
+    '・既存の区分セルは上書きしません\n\n' +
+    'よろしいですか？';
+
+  if (!window.confirm(msg)) return;
+
+  toast('反映中...');
+  run('api_reflectToSchedule', [TOKEN, id], function(r) {
+    if (!r || r.ok === false) {
+      toast('エラー: ' + (r ? r.error || '不明なエラー' : '通信エラー'));
+      return;
+    }
+    // サマリー表示
+    var lines = ['スケジュールへ反映しました:\n'];
+    (r.summary || []).forEach(function(s) {
+      var detail = s.month + ': ' + s.action;
+      if (s.written != null) detail += '（書込' + s.written + '日';
+      if (s.skipped != null && s.skipped > 0) detail += '・スキップ' + s.skipped + '日';
+      if (s.written != null) detail += '）';
+      lines.push(detail);
+    });
+    alert(lines.join('\n'));
+    // 案件のローカル状態を更新（全月成功時のみ「反映済み」）
+    var hasIncomplete = (r.summary || []).some(function(s) { return s.blockMissing || (s.action && s.action.indexOf('シート未作成') >= 0); });
+    c['連動状態'] = hasIncomplete ? '差分あり' : '反映済み';
+    render();
+    toast('反映完了');
+  });
+}
+
+// 案件IDを引数で受ける方式（2026-10-12改修）。
+// 旧実装の currentOpenCase() はモーダル内に該当チップが存在せず常にnullを返す
+// 潜在バグだったため、ID直接指定に修正して廃止した。
+function updateCheck(id, idx, checked) {
+  var c = B.cases.filter(function(x) { return x['案件ID'] === id; })[0];
+  if (!c) return;
+  var items = (c['必要物チェック'] || '').split(',').filter(function(s) { return s.trim(); });
+  if (idx >= items.length) return;
+  var item = items[idx].trim();
+  var base = item.indexOf('[✓]') === 0 ? item.slice(3) : item;
+  items[idx] = checked ? '[✓]' + base : base;
+  var newVal = items.join(',');
+  c['必要物チェック'] = newVal;
+  runBg('api_updateCase', [TOKEN, id, { '必要物チェック': newVal }]);
+}
+
+/* =========================================================
+   添付ファイル
+========================================================= */
+function filesHtml(fs, id, canDel) {
+  if (!fs || !fs.length) return '<div style="font-size:11px;color:#99a;margin-bottom:6px">添付なし</div>';
+  return fs.map(function(x) {
+    var tagM = x.name.match(/^\[([^\]]+)\]/);
+    var tagBadge = tagM ? '<span class="tag-badge">' + esc(tagM[1]) + '</span>' : '';
+    var dispName = tagM ? x.name.slice(tagM[0].length) : x.name;
+    return '<div class="file-item">' + tagBadge +
+      '<a href="' + esc(x.url) + '" target="_blank">' + esc(dispName) + '</a>' +
+      (canDel ? '<span style="cursor:pointer;color:#c88;padding:0 4px;flex-shrink:0" title="削除" onclick="delFile(\'' + esc(id) + '\',\'' + esc(x.id) + '\')">🗑</span>' : '') +
+      '</div>';
+  }).join('');
+}
+function delFile(caseId, fileId) {
+  run('api_deleteFile', [TOKEN, caseId, fileId], function() {
+    run('api_getFiles', [TOKEN, caseId], function(fs) {
+      var el = document.getElementById('files');
+      if (el) el.innerHTML = filesHtml(fs, caseId, true);
+      toast('添付を削除しました');
+    });
+  });
+}
+function handleDrop(e, id, caseName) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag');
+  var file = e.dataTransfer.files[0];
+  if (file) doUpload(id, caseName, file);
+}
+function uploadFile(id, caseName) {
+  var fi = document.getElementById('fi');
+  var file = fi.files[0];
+  if (file) doUpload(id, caseName, file);
+}
+function doUpload(id, caseName, file) {
+  if (file.size > 20 * 1024 * 1024) { toast('20MB以下にしてください'); return; }
+  var tag = document.getElementById('fileTag') ? document.getElementById('fileTag').value : 'その他';
+  toast('アップロード中...');
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var b64 = e.target.result.split(',')[1];
+    run('api_uploadFile', [TOKEN, id, caseName, file.name, b64, file.type, tag], function(r) {
+      if (r.ok === false) { toast(r.error || 'アップロード失敗'); return; }
+      run('api_getFiles', [TOKEN, id], function(fs) {
+        var el = document.getElementById('files');
+        if (el) el.innerHTML = filesHtml(fs, id, B.isAdmin);
+        toast('添付しました');
+      });
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+/* =========================================================
+   写真/領収書アップロード共通（バッチ5・2026-10-13）
+   形式: 画像jpg/png/heic・PDF、1枚10MB以下、一度に5枚まで。
+   サーバ側 validateUploads_ でも同条件を強制（二重防御）
+========================================================= */
+var UP_MAX_FILES = 5;
+var UP_MAX_BYTES = 10 * 1024 * 1024;
+
+// 添付可否チェック。OKなら '' / NGなら理由文字列を返す
+function upFileOk(f) {
+  var name = String(f.name || '').toLowerCase();
+  var type = String(f.type || '').toLowerCase();
+  var okType = /^image\/(jpeg|jpg|png|heic|heif)$/.test(type) || type === 'application/pdf';
+  var okExt = /\.(jpg|jpeg|png|heic|heif|pdf)$/.test(name);
+  if (!okType && !okExt) return '画像（JPG/PNG/HEIC）またはPDFのみ添付できます: ' + (f.name || '不明なファイル');
+  if (f.size > UP_MAX_BYTES) return '1枚10MB以下にしてください: ' + (f.name || '不明なファイル');
+  return '';
+}
+
+// File[] を順番にbase64化して cb([{name,mimeType,base64}...]) を呼ぶ。失敗時は cb(null, ファイル名)
+function readFilesB64(files, cb) {
+  var out = [];
+  var i = 0;
+  (function next() {
+    if (i >= files.length) { cb(out); return; }
+    var f = files[i++];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var b64 = String(e.target.result).split(',')[1] || '';
+      if (!b64) { cb(null, f.name || ''); return; }
+      out.push({ name: f.name || '', mimeType: f.type || '', base64: b64 });
+      next();
+    };
+    reader.onerror = function() { cb(null, f.name || ''); };
+    reader.readAsDataURL(f);
+  })();
+}
+
+// 選択済みファイルの一覧HTML（✕で1枚ずつ外せる）
+function upFileListHtml(files, removeFnName) {
+  return files.map(function(f, i) {
+    var icon = /\.pdf$/i.test(f.name || '') || f.type === 'application/pdf' ? '📄' : '📷';
+    return '<div class="file-item">' + icon +
+      ' <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(f.name || ('ファイル' + (i + 1))) + '</span>' +
+      '<span style="cursor:pointer;color:#c88;padding:0 4px;flex-shrink:0" onclick="' + removeFnName + '(' + i + ')">✕</span></div>';
+  }).join('');
+}
+
+/* =========================================================
+   日程ピッカー
+========================================================= */
+var PICKERS = {};
+
+function isKariPid(pid) { return pid === 'kari' || pid === 'new_kari'; }
+
+function renderPickerHtml(pid, val) {
+  if (isKariPid(pid)) {
+    return '<div class="kari-picker-wrap" id="picker-' + pid + '">' +
+      '<div class="kari-chip-scroll">' +
+      '<div class="kari-chip-grid" id="kari-chip-grid-' + pid + '"></div>' +
+      '</div>' +
+      '<div class="kari-picker-chips" id="picker-chips-' + pid + '"></div>' +
+      '</div>';
+  }
+  return '<div class="picker-wrap" id="picker-' + pid + '">' +
+    '<div class="picker-header">' +
+    '<button onclick="pickerPrev(\'' + pid + '\')">&#8249;</button>' +
+    '<span class="month-label" id="picker-month-' + pid + '"></span>' +
+    '<button onclick="pickerNext(\'' + pid + '\')">&#8250;</button>' +
+    '<div class="picker-mode-group">' +
+    '<button class="picker-mode" id="picker-mode-single-' + pid + '" onclick="pickerSetMode(\'' + pid + '\',\'single\')">単日</button>' +
+    '<button class="picker-mode" id="picker-mode-multi-' + pid + '" onclick="pickerSetMode(\'' + pid + '\',\'multi\')">複数</button>' +
+    '<button class="picker-mode" id="picker-mode-range-' + pid + '" onclick="pickerSetMode(\'' + pid + '\',\'range\')">期間</button>' +
+    '</div>' +
+    '</div>' +
+    '<div class="picker-range-hint" id="picker-hint-' + pid + '"></div>' +
+    '<div class="picker-grid" id="picker-grid-' + pid + '"></div>' +
+    '<div class="picker-chips" id="picker-chips-' + pid + '"></div>' +
+    '</div>';
+}
+
+// 末日を返す（うるう年対応）
+function lastDay(year, month1based) {
+  return new Date(year, month1based, 0).getDate();
+}
+
+// レンジ文字列 "YYYY-MM-01~YYYY-MM-15" を生成
+function kariSegStr(year, month1based, half) {
+  var y = year, m = String(month1based).padStart(2, '0');
+  if (half === 'zen') return y + '-' + m + '-01~' + y + '-' + m + '-15';
+  if (half === 'go')  return y + '-' + m + '-16~' + y + '-' + m + '-' + String(lastDay(year, month1based)).padStart(2, '0');
+  // all
+  return y + '-' + m + '-01~' + y + '-' + m + '-' + String(lastDay(year, month1based)).padStart(2, '0');
+}
+
+// セグ文字列から YYYYMM を返す
+function kariSegYM(seg) { return seg.slice(0, 7); } // "YYYY-MM"
+
+// セグ文字列の「半」を判定: 'zen'|'go'|'all'
+function kariSegHalf(seg) {
+  var p = seg.split('~');
+  if (p.length !== 2) return null;
+  var d1 = Number(p[0].slice(8, 10)), d2 = Number(p[1].slice(8, 10));
+  var ym = p[0].slice(0, 7);
+  var yr = Number(ym.slice(0, 4)), mo = Number(ym.slice(5, 7));
+  if (d1 === 1 && d2 === 15) return 'zen';
+  if (d1 === 16 && d2 === lastDay(yr, mo)) return 'go';
+  if (d1 === 1 && d2 === lastDay(yr, mo)) return 'all';
+  return null;
+}
+
+// 既存仮日程の日付文字列から半月セグ配列に変換（後方互換フォールバック）
+function kariSegsFromOldDates(val) {
+  if (!val || !val.trim()) return [];
+  var segs = [];
+  val.split(';').forEach(function(seg) {
+    seg = seg.trim();
+    if (!seg) return;
+    // すでにレンジ形式の場合: 半月判定
+    if (seg.indexOf('~') >= 0) {
+      var h = kariSegHalf(seg);
+      if (h) { segs.push(seg); return; }
+      // 非半月レンジ: 月単位に丸める（開始月の通月として追加）
+      var ym = seg.slice(0, 7);
+      var yr = Number(ym.slice(0, 4)), mo = Number(ym.slice(5, 7));
+      var allSeg = kariSegStr(yr, mo, 'all');
+      if (segs.indexOf(allSeg) < 0) segs.push(allSeg);
+    } else {
+      // 単日: その月の通月として追加
+      var ym2 = seg.slice(0, 7);
+      var yr2 = Number(ym2.slice(0, 4)), mo2 = Number(ym2.slice(5, 7));
+      var allSeg2 = kariSegStr(yr2, mo2, 'all');
+      if (segs.indexOf(allSeg2) < 0) segs.push(allSeg2);
+    }
+  });
+  return segs;
+}
+
+function initPicker(pid, val) {
+  var today = new Date();
+  if (isKariPid(pid)) {
+    // 仮日程: セグメント配列で管理
+    var rawSegs = [];
+    if (val && val.trim()) {
+      val.split(';').forEach(function(seg) {
+        seg = seg.trim(); if (!seg) return;
+        var h = kariSegHalf(seg);
+        if (h) { rawSegs.push(seg); }
+        else {
+          // 後方互換: 通月または単日を通月セグに変換
+          var alt = kariSegsFromOldDates(seg);
+          alt.forEach(function(s) { if (rawSegs.indexOf(s) < 0) rawSegs.push(s); });
+        }
+      });
+    }
+    PICKERS[pid] = {
+      year: today.getFullYear(),
+      month: today.getMonth(),  // 0-based
+      segs: rawSegs,            // 仮日程専用: レンジ文字列配列
+      isKari: true,
+    };
+  } else {
+    PICKERS[pid] = {
+      year: today.getFullYear(),
+      month: today.getMonth(),
+      dates: parseDateStr(val),
+      mode: 'multi',
+      rangeStep: 0,
+      rangeStart: null,
+    };
+  }
+  renderPickerUI(pid);
+}
+
+// 仮日程の表示文字列（半月認識）
+function formatKariDisplay(seg) {
+  if (!seg || seg.indexOf('~') < 0) return seg;
+  var p = seg.split('~');
+  var ym = p[0].slice(0, 7);
+  var yr = Number(ym.slice(0, 4)), mo = Number(ym.slice(5, 7));
+  var h = kariSegHalf(seg);
+  var prefix = yr + '年' + mo + '月';
+  if (h === 'zen') return prefix + '前半';
+  if (h === 'go')  return prefix + '後半';
+  if (h === 'all') return prefix;
+  return prefix + '(' + Number(p[0].slice(8,10)) + '〜' + Number(p[1].slice(8,10)) + '日)';
+}
+
+// 仮日程のセグ配列を保存文字列に変換
+function serializeKariSegs(segs) {
+  if (!segs || !segs.length) return '';
+  return segs.join(';');
+}
+
+// 仮日程のセグ配列を Date[] に変換（タイムライン用後方互換）
+function kariSegsToDates(segs) {
+  var dates = [];
+  segs.forEach(function(seg) { dates = dates.concat(parseDateStr(seg)); });
+  return dates;
+}
+
+// 前半+後半が両方ある月を通月1レンジに統合
+function kariMergeSegs(segs) {
+  var byYM = {};
+  segs.forEach(function(seg) {
+    var ym = kariSegYM(seg);
+    if (!byYM[ym]) byYM[ym] = [];
+    byYM[ym].push(seg);
+  });
+  var result = [];
+  Object.keys(byYM).sort().forEach(function(ym) {
+    var list = byYM[ym];
+    var yr = Number(ym.slice(0, 4)), mo = Number(ym.slice(5, 7));
+    var hasZen = list.some(function(s) { return kariSegHalf(s) === 'zen'; });
+    var hasGo  = list.some(function(s) { return kariSegHalf(s) === 'go'; });
+    var hasAll = list.some(function(s) { return kariSegHalf(s) === 'all'; });
+    if (hasAll || (hasZen && hasGo)) {
+      result.push(kariSegStr(yr, mo, 'all'));
+    } else if (hasZen) {
+      result.push(kariSegStr(yr, mo, 'zen'));
+    } else if (hasGo) {
+      result.push(kariSegStr(yr, mo, 'go'));
+    }
+  });
+  return result;
+}
+
+function renderPickerUI(pid) {
+  var p = PICKERS[pid];
+  if (!p) return;
+
+  if (p.isKari) {
+    // チップグリッドを再描画
+    var grid = document.getElementById('kari-chip-grid-' + pid);
+    if (grid) {
+      var today = new Date();
+      var baseY = today.getFullYear(), baseM = today.getMonth() + 1;
+      var merged = kariMergeSegs(p.segs);
+      var html = '';
+      var prevYear = null;
+      for (var i = 0; i < 28; i++) {  // 14ヶ月 × 前半/後半 = 28チップ
+        var mi = Math.floor(i / 2);  // 0〜13
+        var isGo = (i % 2 === 1);    // 0=前半, 1=後半
+        var cy = baseY, cm = baseM + mi;
+        while (cm > 12) { cm -= 12; cy++; }
+        // 年ラベル
+        if (prevYear !== null && cy !== prevYear) {
+          html += '<div class="kari-year-label">── ' + cy + '年 ──</div>';
+        }
+        prevYear = cy;
+        var half = isGo ? 'go' : 'zen';
+        var seg = kariSegStr(cy, cm, half);
+        var isOn = merged.indexOf(seg) >= 0;
+        var label = (cy !== baseY ? cy + '年' : '') + cm + '月' + (isGo ? '後半' : '前半');
+        html += '<div class="kari-chip-item' + (isOn ? ' on' : '') + '"' +
+          ' onclick="kariPickerClickChip(\'' + pid + '\',\'' + seg + '\')">' +
+          label + '</div>';
+      }
+      grid.innerHTML = html;
+    }
+
+    // 選択済みチップ（過去月含む全セグ）
+    var chips = document.getElementById('picker-chips-' + pid);
+    if (chips) {
+      var merged2 = kariMergeSegs(p.segs);
+      if (merged2.length) {
+        chips.innerHTML = merged2.map(function(seg) {
+          var disp = formatKariDisplay(seg);
+          return '<span class="pchip" data-seg="' + esc(seg) + '">' + esc(disp) +
+            '<span onclick="pickerRemoveSeg(\'' + pid + '\',this.parentNode.getAttribute(\'data-seg\'))">×</span></span>';
+        }).join('');
+      } else {
+        chips.innerHTML = '';
+      }
+    }
+    kikanMaybeRender(pid); // 仮日程変更に期間別人数マスを追従
+    return;
+  }
+
+  // 正式日程ピッカー（既存ロジック）
+  var months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+  var ml2 = document.getElementById('picker-month-' + pid);
+  if (ml2) ml2.textContent = p.year + '年 ' + months[p.month];
+
+  ['single', 'multi', 'range'].forEach(function(m) {
+    var btn = document.getElementById('picker-mode-' + m + '-' + pid);
+    if (btn) btn.classList.toggle('on', p.mode === m);
+  });
+  var hint = document.getElementById('picker-hint-' + pid);
+  if (hint) hint.textContent = (p.mode === 'range' && p.rangeStep === 1) ? '終了日を選択してください' : '';
+
+  var grid = document.getElementById('picker-grid-' + pid);
+  if (!grid) return;
+  var toYmd = function(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  var selSet = {};
+  p.dates.forEach(function(d) { selSet[toYmd(d)] = true; });
+
+  var html = ['日', '月', '火', '水', '木', '金', '土'].map(function(d, i) {
+    var cls = i === 0 ? ' sun' : (i === 6 ? ' sat' : '');
+    return '<div class="day-head' + cls + '">' + d + '</div>';
+  }).join('');
+
+  var firstDay = new Date(p.year, p.month, 1);
+  var startDow = firstDay.getDay();
+  var daysInMonth = new Date(p.year, p.month + 1, 0).getDate();
+  for (var i = 0; i < startDow; i++) html += '<div class="day empty"></div>';
+  for (var d = 1; d <= daysInMonth; d++) {
+    var date = new Date(p.year, p.month, d);
+    var ymd = toYmd(date);
+    var dow = date.getDay();
+    var cls = 'day';
+    if (dow === 0) cls += ' sun'; else if (dow === 6) cls += ' sat';
+    cls += selSet[ymd] ? ' sel' : '';
+    html += '<div class="' + cls + '" onclick="pickerClickDay(\'' + pid + '\',' + d + ')">' + d + '</div>';
+  }
+  grid.innerHTML = html;
+
+  var chips2 = document.getElementById('picker-chips-' + pid);
+  if (chips2) {
+    var serialized = serializeDates(p.dates);
+    if (serialized) {
+      var saveSegs = serialized.split(';');
+      chips2.innerHTML = saveSegs.map(function(saveSeg) {
+        var dispSeg = formatDateDisplay(saveSeg);
+        return '<span class="pchip" data-seg="' + esc(saveSeg) + '">' + esc(dispSeg) + '<span onclick="pickerRemoveSeg(\'' + pid + '\',this.parentNode.getAttribute(\'data-seg\'))">×</span></span>';
+      }).join('');
+    } else {
+      chips2.innerHTML = '';
+    }
+  }
+  kikanMaybeRender(pid); // 正式日程変更に期間別人数マスを追従
+}
+
+function kariPickerClick(pid, half) {
+  var p = PICKERS[pid];
+  if (!p || !p.isKari) return;
+  var yr = p.year, mo = p.month + 1;
+  var seg = kariSegStr(yr, mo, half);
+  var merged = kariMergeSegs(p.segs);
+  var idx = merged.indexOf(seg);
+  if (idx >= 0) {
+    // 通月→前半+後半を除去、前半→除去、後半→除去
+    var toRemove = [seg];
+    // all を押した場合は前半・後半もあれば除去
+    if (half === 'all') {
+      var zenSeg = kariSegStr(yr, mo, 'zen');
+      var goSeg  = kariSegStr(yr, mo, 'go');
+      toRemove.push(zenSeg, goSeg);
+    }
+    merged = merged.filter(function(s) { return toRemove.indexOf(s) < 0; });
+  } else {
+    // 追加してから再統合（前半+後半→通月の自動マージ）
+    merged.push(seg);
+    merged = kariMergeSegs(merged);
+  }
+  p.segs = merged;
+  renderPickerUI(pid);
+}
+
+function pickerClickDay(pid, d) {
+  var p = PICKERS[pid];
+  if (!p) return;
+  var toYmd = function(dt) { return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
+  var clicked = new Date(p.year, p.month, d);
+  if (p.mode === 'single') {
+    // 単日: タップした日のみに置き換え（既存選択クリア）
+    p.dates = [clicked];
+  } else if (p.mode === 'multi') {
+    // 複数: トグル（追加/解除）
+    var ymd = toYmd(clicked);
+    var idx = -1;
+    for (var i = 0; i < p.dates.length; i++) { if (toYmd(p.dates[i]) === ymd) { idx = i; break; } }
+    if (idx >= 0) p.dates.splice(idx, 1);
+    else p.dates.push(clicked);
+  } else {
+    // 期間モード
+    if (p.rangeStep === 0) {
+      p.rangeStart = clicked; p.rangeStep = 1;
+    } else {
+      var start = p.rangeStart < clicked ? p.rangeStart : clicked;
+      var end = p.rangeStart < clicked ? clicked : p.rangeStart;
+      var existSet = {};
+      p.dates.forEach(function(dt) { existSet[toYmd(dt)] = true; });
+      var cur = new Date(start);
+      while (cur <= end) { var ky = toYmd(cur); if (!existSet[ky]) { p.dates.push(new Date(cur)); existSet[ky] = true; } cur.setDate(cur.getDate() + 1); }
+      p.rangeStep = 0; p.rangeStart = null;
+    }
+  }
+  renderPickerUI(pid);
+}
+
+function kariPickerClickChip(pid, seg) {
+  var p = PICKERS[pid];
+  if (!p || !p.isKari) return;
+  var merged = kariMergeSegs(p.segs);
+  var idx = merged.indexOf(seg);
+  if (idx >= 0) {
+    merged.splice(idx, 1);
+  } else {
+    merged.push(seg);
+    merged = kariMergeSegs(merged);
+  }
+  p.segs = merged;
+  renderPickerUI(pid);
+}
+
+function pickerRemoveSeg(pid, segStr) {
+  var p = PICKERS[pid];
+  if (!p) return;
+  if (p.isKari) {
+    p.segs = p.segs.filter(function(s) { return s !== segStr; });
+    renderPickerUI(pid);
+    return;
+  }
+  var serialized = serializeDates(p.dates);
+  var segs = serialized ? serialized.split(';') : [];
+  var idx = segs.indexOf(segStr);
+  if (idx >= 0) segs.splice(idx, 1);
+  p.dates = parseDateStr(segs.join(';'));
+  renderPickerUI(pid);
+}
+
+function pickerPrev(pid) { var p = PICKERS[pid]; if (!p) return; p.month--; if (p.month < 0) { p.month = 11; p.year--; } renderPickerUI(pid); }
+function pickerNext(pid) { var p = PICKERS[pid]; if (!p) return; p.month++; if (p.month > 11) { p.month = 0; p.year++; } renderPickerUI(pid); }
+function pickerSetMode(pid, mode) { var p = PICKERS[pid]; if (!p) return; p.mode = mode; p.rangeStep = 0; p.rangeStart = null; renderPickerUI(pid); }
+
+/* =========================================================
+   新規案件モーダル（管理者のみ）
+========================================================= */
+function openNew() {
+  var clientOpts = [''].concat(B.clients).map(function(c) { return '<option>' + esc(c) + '</option>'; }).join('');
+  var staffOpts = [''].concat(B.staff).map(function(s) { return '<option>' + esc(s) + '</option>'; }).join('');
+  var statusOpts = COLS.map(function(s) { return '<option' + (s === '未定' ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('');
+
+  var html = '<div class="mhead"><h2>＋ 新規案件</h2><span class="close" onclick="closeModal()">✕</span></div>' +
+    '<div style="padding:16px 20px"><div class="frm" id="nfrm">' +
+    '<label><span>★取引先</span><input data-k="取引先" list="cl2"><datalist id="cl2">' + (B.clients || []).map(function(v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist></label>' +
+    '<label><span>★案件名</span><input data-k="案件名" placeholder="○○電気工事 など"></label>' +
+    '<label><span>ステータス</span><select data-k="ステータス">' + statusOpts + '</select></label>' +
+    '<label><span>区分</span><select data-k="区分"><option>地場</option><option>出張</option></select></label>' +
+    '<label><span>担当者</span><input data-k="担当者" list="sf2"><datalist id="sf2">' + (B.staff || []).map(function(v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist></label>' +
+    '<div></div>' +
+    '<div class="w100"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">仮日程</h4>' +
+    renderPickerHtml('new_kari', '') + '</div>' +
+    '<label class="w100"><span>メモ</span><textarea data-k="メモ" rows="2"></textarea></label>' +
+    '</div><div class="btns"><button class="btn save" id="createBtn" onclick="createCase()">登録する</button></div></div>';
+
+  document.getElementById('modal').innerHTML = html;
+  document.getElementById('ov').style.display = 'block';
+  initPicker('new_kari', '');
+}
+
+var creating = false;
+function createCase() {
+  if (creating) return;
+  var p = {};
+  document.querySelectorAll('#nfrm [data-k]').forEach(function(el) { p[el.dataset.k] = el.value; });
+  var nkP = PICKERS['new_kari'];
+  p['仮日程'] = nkP ? (nkP.isKari ? serializeKariSegs(kariMergeSegs(nkP.segs)) : serializeDates(nkP.dates)) : '';
+  if (!p['取引先'] || !p['案件名']) { toast('★取引先と案件名は必須です'); return; }
+
+  creating = true;
+  var btn = document.getElementById('createBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '登録中...'; }
+
+  run('api_createCase', [TOKEN, p], function(r) {
+    creating = false;
+    if (r.ok === false) { toast(r.error || '登録できませんでした'); return; }
+    var newCase = { '案件ID': r.id, 'ステータス': p['ステータス'] || '未定', '必要物チェック': '', '添付フォルダURL': '' };
+    Object.keys(p).forEach(function(k) { newCase[k] = p[k]; });
+    B.cases.push(newCase);
+    var cv = (p['取引先'] || '').trim();
+    if (cv && B.clients.indexOf(cv) < 0) B.clients.push(cv);
+    var sv = (p['担当者'] || '').trim();
+    if (sv && B.staff.indexOf(sv) < 0) B.staff.push(sv);
+    toast('登録しました: ' + r.id);
+    closeModal();
+    render();
+  });
+}
+
+/* =========================================================
+   配車表タブ
+========================================================= */
+var haishaYear  = null;
+var haishaMonth = null;
+var haishaLoaded = false;
+
+function renderHaisha() {
+  // 初回: 当月
+  if (haishaYear === null) {
+    var now = new Date();
+    haishaYear  = now.getFullYear();
+    haishaMonth = now.getMonth() + 1;
+  }
+
+  var el = document.getElementById('view');
+  el.innerHTML =
+    '<div class="haisha-ctrl">' +
+      '<div class="month-nav">' +
+        '<button onclick="haishaChangeMonth(-1)">&#8249;</button>' +
+        '<span class="cur-month" id="haishaMonthLabel">' + haishaYear + '年' + haishaMonth + '月</span>' +
+        '<button onclick="haishaChangeMonth(1)">&#8250;</button>' +
+      '</div>' +
+      '<div class="haisha-btns">' +
+        '<a id="haishaEditBtn" href="#" target="_blank" style="display:none">スプシで編集する ↗</a>' +
+        '<a onclick="haishaRefresh()">↻ 更新</a>' +
+      '</div>' +
+    '</div>' +
+    '<div class="haisha-scroll" id="haishaBody"><div class="empty">読み込み中...</div></div>';
+
+  loadHaishaData(false);
+}
+
+function haishaChangeMonth(delta) {
+  haishaMonth += delta;
+  if (haishaMonth > 12) { haishaMonth = 1; haishaYear++; }
+  if (haishaMonth < 1)  { haishaMonth = 12; haishaYear--; }
+  var lbl = document.getElementById('haishaMonthLabel');
+  if (lbl) lbl.textContent = haishaYear + '年' + haishaMonth + '月';
+  loadHaishaData(false);
+}
+
+function haishaRefresh() {
+  // キャッシュ破棄してから再取得
+  run('api_clearHaishaCache', [TOKEN, haishaYear, haishaMonth], function() {
+    loadHaishaData(false);
+  });
+}
+
+function loadHaishaData(forceReload, silent) {
+  var body = document.getElementById('haishaBody');
+  if (body && !silent) body.innerHTML = '<div class="empty">読み込み中...</div>';
+  run('api_getHaisha', [TOKEN, haishaYear, haishaMonth], function(r) {
+    if (V !== 'haisha') return; // タブ離脱済みなら描画しない
+    var body = document.getElementById('haishaBody');
+    if (!body) return;
+    if (!r || !r.ok) {
+      body.innerHTML = '<div class="empty">' + esc(r ? r.error || 'エラーが発生しました' : 'エラー') + '</div>';
+      return;
+    }
+    // スプシ編集ボタン
+    var editBtn = document.getElementById('haishaEditBtn');
+    if (editBtn && r.ssUrl) {
+      editBtn.href = r.ssUrl;
+      editBtn.style.display = '';
+    }
+    // テーブル描画（自動更新時はスクロール位置を保持）
+    var sl = body.scrollLeft, st = body.scrollTop;
+    body.innerHTML = buildHaishaTable(r.cells);
+    if (silent) { body.scrollLeft = sl; body.scrollTop = st; }
+  });
+}
+
+function buildHaishaTable(cells) {
+  if (!cells || !cells.length) return '<div class="empty">データがありません</div>';
+  var html = '<table class="haisha-tbl">';
+  cells.forEach(function(row, ri) {
+    html += ri === 0 ? '<tr>' : '<tr>';
+    row.forEach(function(cell, ci) {
+      var bg = cell.bg ? ' style="background:' + esc(cell.bg) + '"' : '';
+      var tag = ri === 0 ? 'th' : 'td';
+      html += '<' + tag + bg + '>' + esc(cell.v) + '</' + tag + '>';
+    });
+    html += '</tr>';
+  });
+  html += '</table>';
+  return html;
+}
+
+/* =========================================================
+   配置タブ
+========================================================= */
+var haichiYear  = null;
+var haichiMonth = null;
+
+function renderHaichi() {
+  if (haichiYear === null) {
+    var now = new Date();
+    haichiYear  = now.getFullYear();
+    haichiMonth = now.getMonth() + 1;
+  }
+
+  var el = document.getElementById('view');
+  el.innerHTML =
+    '<div class="haichi-ctrl">' +
+      '<span style="font-size:13px;font-weight:bold;color:#1565c0">' + haichiYear + '年' + haichiMonth + '月</span>' +
+      '<button class="refresh-btn" onclick="haichiRefresh()">↻ 更新</button>' +
+    '</div>' +
+    '<div class="haichi-wrap" id="haichiBody"><div class="empty">読み込み中...</div></div>';
+
+  loadHaichiData(false);
+}
+
+function haichiRefresh() {
+  run('api_clearHaichiCache', [TOKEN, haichiYear, haichiMonth], function() {
+    loadHaichiData(true);
+  });
+}
+
+function loadHaichiData(clearCache, silent) {
+  var body = document.getElementById('haichiBody');
+  if (body && !silent) body.innerHTML = '<div class="empty">読み込み中...</div>';
+  run('api_getHaichi', [TOKEN, haichiYear, haichiMonth, !!clearCache], function(r) {
+    if (V !== 'haichi') return;
+    var body = document.getElementById('haichiBody');
+    if (!body) return;
+    if (!r || !r.ok) {
+      body.innerHTML = '<div class="empty">' + esc(r ? r.error || 'エラーが発生しました' : 'エラー') + '</div>';
+      return;
+    }
+    body.innerHTML = buildHaichiHtml(r);
+  });
+}
+
+// 配車表・配置・外注予定タブの5分毎自動再取得（タブを開いて画面が見えている間だけ。
+// サーバーキャッシュを破棄してから静かに再取得するので、スプシの編集が放置画面にも反映される）
+setInterval(function() {
+  if (document.hidden) return;
+  if (V === 'haisha') {
+    run('api_clearHaishaCache', [TOKEN, haishaYear, haishaMonth], function() {
+      loadHaishaData(false, true);
+    });
+  } else if (V === 'haichi') {
+    run('api_clearHaichiCache', [TOKEN, haichiYear, haichiMonth], function() {
+      loadHaichiData(true, true);
+    });
+  } else if (V === 'gaichu') {
+    loadGaichuData(true, true);
+  } else if (V === 'sched') {
+    loadSchedData(true, true);
+  }
+}, 5 * 60 * 1000);
+
+/* =========================================================
+   外注予定タブ（バッチ4・2026-10-13）
+   本体スケジュールから外注会社メンバーの日別配置を日付×メンバー表で表示。
+   L0/L1=会社セレクタで切替可・L3=自社固定（サーバ側で強制）。
+   見た目は山竜の予定共有スプシと同じ（行=日付・曜日、列=メンバー、
+   セル=取引先名（出張等付記・同ブロック同名複数は×N集約）、土日行は薄色分け）
+   月切替は前月〜当月+2（バッチ6・2026-10-13。一覧はサーバ側生成）
+========================================================= */
+var gaichuMonth = '';    // 'YYYY.MM'（空=サーバ側で当月）
+var gaichuCompany = '';  // L0/L1のみ有効（L3はサーバ側で自社強制・この値は無視される）
+
+function renderGaichu() {
+  var el = document.getElementById('view');
+  el.innerHTML =
+    '<div class="haisha-ctrl">' +
+      '<div class="month-nav" id="gaichuMonthBtns"></div>' +
+      '<span id="gaichuCompanyWrap"></span>' +
+      '<div class="haisha-btns">' +
+        '<a onclick="gaichuRefresh()">↻ 更新</a>' +
+      '</div>' +
+    '</div>' +
+    '<div class="haisha-scroll" id="gaichuBody"><div class="empty">読み込み中...</div></div>';
+  loadGaichuData(false);
+}
+
+function gaichuRefresh() { loadGaichuData(true); }
+function gaichuPickMonth(m) { gaichuMonth = m; loadGaichuData(false); }
+function gaichuPickCompany(c) { gaichuCompany = c; loadGaichuData(false); }
+
+function loadGaichuData(clearCache, silent) {
+  var body = document.getElementById('gaichuBody');
+  if (body && !silent) body.innerHTML = '<div class="empty">読み込み中...</div>';
+  run('api_getGaichuYotei', [TOKEN, gaichuCompany, gaichuMonth, !!clearCache], function(r) {
+    if (V !== 'gaichu') return;
+    var body = document.getElementById('gaichuBody');
+    if (!body) return;
+    if (r) {
+      if (r.month) gaichuMonth = r.month;
+      if (r.company) gaichuCompany = r.company;
+      drawGaichuCtrl(r);
+    }
+    if (!r || !r.ok) {
+      body.innerHTML = '<div class="empty">' + esc(r ? r.error || 'エラーが発生しました' : 'エラー') + '</div>';
+      return;
+    }
+    var sl = body.scrollLeft, st = body.scrollTop;
+    body.innerHTML = buildGaichuTable(r);
+    if (silent) { body.scrollLeft = sl; body.scrollTop = st; }
+  });
+}
+
+function drawGaichuCtrl(r) {
+  // 月切替ボタン（前月〜当月+2ヶ月・サーバ側生成の一覧のみ）
+  var btns = document.getElementById('gaichuMonthBtns');
+  if (btns && r.months && r.months.length) {
+    btns.innerHTML = r.months.map(function(n) {
+      var off = 'background:#fff;color:#1976d2;border:1px solid #1976d2;';
+      return '<button style="font-size:12px;' + (n === r.month ? '' : off) + '"' +
+        ' onclick="gaichuPickMonth(\'' + esc(n) + '\')">' + esc(n) + '</button>';
+    }).join('');
+  }
+  // 会社セレクタ（L0/L1のみ）。L3は自社名の固定表示
+  var cw = document.getElementById('gaichuCompanyWrap');
+  if (!cw) return;
+  if (r.canSwitch && r.companies && r.companies.length) {
+    cw.innerHTML = '会社: <select class="fsort" id="gaichuCompanySel">' +
+      r.companies.map(function(c) {
+        return '<option' + (c === r.company ? ' selected' : '') + '>' + esc(c) + '</option>';
+      }).join('') + '</select>';
+    var sel = document.getElementById('gaichuCompanySel');
+    if (sel) sel.onchange = function() { gaichuPickCompany(this.value); };
+  } else if (r.company) {
+    cw.innerHTML = '<span class="gaichu-company">' + esc(r.company) + '</span>';
+  } else {
+    cw.innerHTML = '';
+  }
+}
+
+function buildGaichuTable(r) {
+  if (!r.members || !r.members.length) {
+    return '<div class="empty">この会社のメンバーがマスタに登録されていません</div>';
+  }
+  var html = '<table class="gaichu-tbl"><tr><th>日付</th><th>曜</th>' +
+    r.members.map(function(n) { return '<th>' + esc(n) + '</th>'; }).join('') + '</tr>';
+  (r.days || []).forEach(function(d) {
+    var cls = d.dow === 0 ? ' class="wk-sun"' : (d.dow === 6 ? ' class="wk-sat"' : '');
+    html += '<tr' + cls + '><td class="gaichu-day">' + d.day + '</td><td>' + esc(d.youbi) + '</td>' +
+      r.members.map(function(n) { return '<td>' + esc((d.cells && d.cells[n]) || '') + '</td>'; }).join('') +
+      '</tr>';
+  });
+  html += '</table>';
+  return html;
+}
+
+function buildHaichiHtml(r) {
+  // 今日・明日セクション
+  var todayValClass = (r.todayLabel === '配置なし') ? ' none' : '';
+  var tomorrowValClass = (r.tomorrowLabel === '配置なし' || r.tomorrowLabel === 'シートなし') ? ' none' : '';
+
+  var todaySection =
+    '<div class="haichi-today">' +
+      '<h4>今日・明日の配置</h4>' +
+      '<div class="haichi-today-row">' +
+        '<div class="haichi-today-item">' +
+          '<div class="day-label">今日</div>' +
+          '<div class="day-val' + todayValClass + '">' + esc(r.todayLabel) + '</div>' +
+        '</div>' +
+        '<div class="haichi-today-item">' +
+          '<div class="day-label">明日</div>' +
+          '<div class="day-val' + tomorrowValClass + '">' + esc(r.tomorrowLabel) + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  // 今週テーブルセクション
+  var weekHtml = '';
+  if (r.weekTable && r.weekTable.length) {
+    var headers = '<th class="name-col">氏名</th>';
+    if (r.weekTable[0] && r.weekTable[0].days) {
+      r.weekTable[0].days.forEach(function(d) {
+        headers += '<th>' + esc(d.date) + '</th>';
+      });
+    }
+    var rows = r.weekTable.map(function(person) {
+      var cells = '<td class="name-col">' + esc(person.name) + '</td>';
+      (person.days || []).forEach(function(d) {
+        cells += '<td>' + esc(d.label) + '</td>';
+      });
+      return '<tr>' + cells + '</tr>';
+    }).join('');
+
+    weekHtml =
+      '<div class="haichi-week">' +
+        '<h4>今週の配置（月〜日）</h4>' +
+        '<div class="haichi-week-scroll">' +
+          '<table class="haichi-week-tbl">' +
+            '<tr>' + headers + '</tr>' +
+            rows +
+          '</table>' +
+        '</div>' +
+      '</div>';
+  } else {
+    weekHtml = '<div class="haichi-week"><div class="empty">今週のデータがありません</div></div>';
+  }
+
+  return todaySection + weekHtml;
+}
+
+/* =========================================================
+   スケジュールタブ（P3c: リンク→アプリ内表示に変更）
+========================================================= */
+var schedSheet = '';  // 現在表示中の月シート名（'YYYY.MM'）
+
+function renderSched() {
+  var el = document.getElementById('view');
+  el.innerHTML =
+    '<div class="haisha-ctrl">' +
+      '<div class="month-nav" id="schedMonthBtns"></div>' +
+      '<div class="haisha-btns">' +
+        '<a id="schedOpenBtn" href="#" target="_blank" style="display:none">スプシで開く ↗</a>' +
+        '<a onclick="schedRefresh()">↻ 更新</a>' +
+      '</div>' +
+    '</div>' +
+    '<div class="haisha-scroll" id="schedBody"><div class="empty">読み込み中...</div></div>';
+  loadSchedData(false);
+}
+
+function schedRefresh() { loadSchedData(true); }
+function schedPickMonth(name) { schedSheet = name; loadSchedData(false); }
+
+function loadSchedData(clearCache, silent) {
+  var body = document.getElementById('schedBody');
+  if (body && !silent) body.innerHTML = '<div class="empty">読み込み中...</div>';
+  run('api_getSchedule', [TOKEN, schedSheet, !!clearCache], function(r) {
+    if (V !== 'sched') return;
+    var body = document.getElementById('schedBody');
+    if (!body) return;
+    if (!r || !r.ok) {
+      body.innerHTML = '<div class="empty">' + esc(r ? r.error || 'エラーが発生しました' : 'エラー') + '</div>';
+      return;
+    }
+    schedSheet = r.sheetName;
+    // 月切替ボタン（3ヶ月ローリング）
+    var btns = document.getElementById('schedMonthBtns');
+    if (btns) {
+      btns.innerHTML = (r.allSheets || []).map(function(n) {
+        var off = 'background:#fff;color:#1976d2;border:1px solid #1976d2;';
+        return '<button style="font-size:12px;' + (n === r.sheetName ? '' : off) + '"' +
+          ' onclick="schedPickMonth(\'' + esc(n) + '\')">' + esc(n) + '</button>';
+      }).join('');
+    }
+    var openBtn = document.getElementById('schedOpenBtn');
+    if (openBtn && r.ssUrl) { openBtn.href = r.ssUrl; openBtn.style.display = ''; }
+    var sl = body.scrollLeft, st = body.scrollTop;
+    body.innerHTML = buildSchedTable(r.cells);
+    if (silent) { body.scrollLeft = sl; body.scrollTop = st; }
+  });
+}
+
+/* スケジュール専用テーブル: 行2（取引先見出し）は後続の空セルをcolspanで統合して表示
+   （閲覧用スプシの結合セルと同じ見た目を再現。データ行の空セルはそのまま） */
+function buildSchedTable(cells) {
+  if (!cells || !cells.length) return '<div class="empty">データがありません</div>';
+  var html = '<table class="haisha-tbl">';
+  cells.forEach(function(row, ri) {
+    html += '<tr>';
+    if (ri === 1) {  // 見出し行（0=タイトル・1=取引先ヘッダー）
+      var ci = 0;
+      while (ci < row.length) {
+        var cell = row[ci];
+        var span = 1;
+        if (cell.v && ci >= 2) {  // 日付/曜日(先頭2列)はspan1のまま
+          while (ci + span < row.length && !row[ci + span].v) span++;
+        }
+        var bg = cell.bg ? ' style="background:' + esc(cell.bg) + '"' : '';
+        html += '<th' + bg + (span > 1 ? ' colspan="' + span + '"' : '') + '>' + esc(cell.v) + '</th>';
+        ci += span;
+      }
+    } else {
+      row.forEach(function(cell) {
+        var bg = cell.bg ? ' style="background:' + esc(cell.bg) + '"' : '';
+        var tag = ri === 0 ? 'th' : 'td';
+        html += '<' + tag + bg + '>' + esc(cell.v) + '</' + tag + '>';
+      });
+    }
+    html += '</tr>';
+  });
+  html += '</table>';
+  return html;
+}
+
+/* =========================================================
+   給与明細タブ（P3c: 本人のみ・管理者は人選択）
+========================================================= */
+var kyuyoPerson = '';  // 管理者の人選択（本人モードでは一切使わない）
+
+function renderKyuyo() {
+  var el = document.getElementById('view');
+  el.innerHTML = '<div class="tbl-wrap" id="kyuyoBody"><div class="empty">読み込み中...</div></div>';
+  if (B.kyuyoAccess === 'admin') {
+    run('api_getKyuyoAdmin', [TOKEN, kyuyoPerson], function(r) { if (V === 'kyuyo') drawKyuyoAdmin(r); });
+  } else {
+    // 本人モード: 対象者を指定する引数は存在しない（サーバ側で資格情報から解決）
+    run('api_getMyKyuyo', [TOKEN], function(r) { if (V === 'kyuyo') drawKyuyoSelf(r); });
+  }
+}
+
+function kyuyoSlipsHtml(name, slips) {
+  var head = '<p style="font-size:12.5px;color:#556;margin-bottom:10px">💴 <b>' + esc(name) +
+    '</b> さんの給与明細（月を選んで開いてください）</p>';
+  if (!slips || !slips.length) return head + '<div class="empty">明細はまだありません</div>';
+  return head + slips.map(function(s) {
+    return '<div class="file-item"><a href="' + esc(s.url) + '" target="_blank">📄 ' + esc(s.name) + '</a></div>';
+  }).join('') +
+  '<p style="font-size:10.5px;color:#8895a2;margin-top:8px">※ファイルを開くには本人のGoogleアカウントでのログインが必要です（二重防御）。</p>';
+}
+
+function drawKyuyoSelf(r) {
+  var body = document.getElementById('kyuyoBody');
+  if (!body) return;
+  if (!r || !r.ok) { body.innerHTML = '<div class="empty">' + esc((r && r.error) || 'エラーが発生しました') + '</div>'; return; }
+  body.innerHTML = kyuyoSlipsHtml(r.name, r.slips);
+}
+
+function drawKyuyoAdmin(r) {
+  var body = document.getElementById('kyuyoBody');
+  if (!body) return;
+  if (!r || !r.ok) { body.innerHTML = '<div class="empty">' + esc((r && r.error) || 'エラーが発生しました') + '</div>'; return; }
+  var sel = '<div style="margin-bottom:12px">対象者: <select class="fsort" onchange="kyuyoPerson=this.value;renderKyuyo()">' +
+    '<option value="">選択してください</option>' +
+    (r.people || []).map(function(n) {
+      return '<option' + (n === kyuyoPerson ? ' selected' : '') + '>' + esc(n) + '</option>';
+    }).join('') + '</select></div>';
+  body.innerHTML = sel + (r.name ? kyuyoSlipsHtml(r.name, r.slips) : '<div class="empty">対象者を選択してください（管理者のみ全員分を閲覧できます）</div>');
+}
+
+/* =========================================================
+   材料報告タブ（P3c: 現場×週・差分式）
+========================================================= */
+var zhCase = '';      // 選択中の案件ID
+var zhWeek = 'this';  // 'this' | 'last'
+var zhPhotos = [];    // 添付予定の写真File配列（バッチ5・送信/再描画でクリア）
+
+function renderZairyoHokoku() {
+  zhPhotos = [];
+  var cases = (B.cases || []).filter(function(c) {
+    return c['ステータス'] === '進行中' || c['ステータス'] === '決定';
+  });
+  var caseOpts = '<option value="">現場を選択してください</option>' + cases.map(function(c) {
+    var label = (c['取引先'] ? c['取引先'] + '｜' : '') + (c['案件名'] || c['案件ID']);
+    return '<option value="' + esc(c['案件ID']) + '"' + (c['案件ID'] === zhCase ? ' selected' : '') + '>' + esc(label) + '</option>';
+  }).join('');
+
+  var el = document.getElementById('view');
+  el.innerHTML =
+    '<div class="tbl-wrap">' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">' +
+      '<select class="fsort" style="max-width:100%" onchange="zhCase=this.value;zhLoad()">' + caseOpts + '</select>' +
+      '<span class="chipbtn' + (zhWeek === 'this' ? ' on' : '') + '" onclick="zhSetWeek(\'this\')">今週</span>' +
+      '<span class="chipbtn' + (zhWeek === 'last' ? ' on' : '') + '" onclick="zhSetWeek(\'last\')">先週</span>' +
+      '<span id="zhWeekLabel" style="font-size:11.5px;color:#8895a2"></span>' +
+    '</div>' +
+    '<div class="sec" id="zhFilesSec" style="display:none"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">📄 この現場の材料資料（タップで開く）</h4>' +
+      '<div id="zhFiles"></div></div>' +
+    '<div class="sec"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">この現場×週の報告済み一覧（⚠ ここにある分は入力しない）</h4>' +
+      '<div id="zhList"><div class="empty">現場を選択してください</div></div></div>' +
+    '<div class="sec"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">新しく使った材料を報告（差分だけ）</h4>' +
+      '<div id="zhRows"></div>' +
+      '<a class="addr-link" onclick="zhAddRow()">＋ 行を追加</a>' +
+      '<div style="margin-top:8px;max-width:420px">' +
+        '<a class="addr-link" onclick="document.getElementById(\'zhPhotoInput\').click()">📷 写真を追加（カメラ/ギャラリー・' + UP_MAX_FILES + '枚まで）</a>' +
+        '<input type="file" id="zhPhotoInput" accept="image/*" multiple style="display:none" onchange="zhPhotosChanged(this)">' +
+        '<div id="zhPhotoList" style="margin-top:4px"></div>' +
+      '</div>' +
+      '<div style="margin-top:8px"><input id="zhMemo" class="fsort" placeholder="メモ（任意）" style="width:280px;max-width:100%"></div>' +
+      '<div class="btns" style="max-width:280px"><button class="btn save" id="zhSendBtn" onclick="zhSubmit()">送信</button></div>' +
+    '</div></div>';
+
+  var rowsEl = document.getElementById('zhRows');
+  if (rowsEl) { rowsEl.innerHTML = ''; zhAddRow(); zhAddRow(); zhAddRow(); }
+  if (zhCase) zhLoad();
+}
+
+/* ---- 材料報告: 写真添付（バッチ5） ---- */
+function zhPhotosChanged(input) {
+  var files = Array.prototype.slice.call(input.files || []);
+  for (var i = 0; i < files.length; i++) {
+    if (zhPhotos.length >= UP_MAX_FILES) { toast('写真は' + UP_MAX_FILES + '枚までです'); break; }
+    var err = upFileOk(files[i]);
+    if (err) { toast(err); continue; }
+    zhPhotos.push(files[i]);
+  }
+  input.value = '';
+  zhDrawPhotoList();
+}
+function zhRemovePhoto(i) { zhPhotos.splice(i, 1); zhDrawPhotoList(); }
+function zhDrawPhotoList() {
+  var el = document.getElementById('zhPhotoList');
+  if (el) el.innerHTML = upFileListHtml(zhPhotos, 'zhRemovePhoto');
+}
+
+/* ---- 材料報告: この現場の材料資料（バッチ5） ---- */
+function zhLoadFiles() {
+  var sec = document.getElementById('zhFilesSec');
+  if (!zhCase) { if (sec) sec.style.display = 'none'; return; }
+  if (sec) { sec.style.display = ''; }
+  var box0 = document.getElementById('zhFiles');
+  if (box0) box0.innerHTML = '<div class="empty" style="padding:4px;font-size:11.5px">読み込み中...</div>';
+  run('api_getZairyoFiles', [TOKEN, zhCase], function(r) {
+    if (V !== 'zairyo') return;
+    var sec = document.getElementById('zhFilesSec');
+    var box = document.getElementById('zhFiles');
+    if (!sec || !box) return;
+    sec.style.display = '';
+    if (!r || !r.ok || !r.files || !r.files.length) {
+      box.innerHTML = '<div class="empty" style="padding:4px;font-size:11.5px">この現場の材料資料は見つかりませんでした</div>';
+      return;
+    }
+    box.innerHTML = r.files.map(function(f) {
+      var icon = /\.pdf$/i.test(f.name || '') ? '📄' : '🖼';
+      return '<div class="file-item"><span class="tag-badge">' + esc(f.source) + '</span>' +
+        '<a href="' + esc(f.url) + '" target="_blank">' + icon + ' ' + esc(f.name) + '</a></div>';
+    }).join('');
+  });
+}
+
+function zhSetWeek(w) { zhWeek = w; render(); }
+
+function zhAddRow() {
+  var rowsEl = document.getElementById('zhRows');
+  if (!rowsEl) return;
+  var div = document.createElement('div');
+  div.className = 'zh-row';
+  div.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;flex-wrap:nowrap';
+  div.innerHTML =
+    '<input class="fsort zh-h" placeholder="品目（例: IV1.6）" style="flex:2;min-width:110px">' +
+    '<input class="fsort zh-q" placeholder="数量" style="flex:1;min-width:55px">' +
+    '<input class="fsort zh-u" placeholder="単位" style="flex:1;min-width:45px">';
+  rowsEl.appendChild(div);
+}
+
+// 写真リンクセル（カンマ区切りURL → 📷1 📷2 ... のリンク列）
+function zhPhotoLinks(photo) {
+  if (!photo) return '';
+  return String(photo).split(',').map(function(u, i) {
+    u = u.trim(); if (!u) return '';
+    return '<a href="' + esc(u) + '" target="_blank" style="white-space:nowrap">📷' + (i + 1) + '</a>';
+  }).filter(Boolean).join(' ');
+}
+
+function zhLoad() {
+  zhLoadFiles(); // この現場の材料資料も併せて更新（バッチ5）
+  var list = document.getElementById('zhList');
+  if (!zhCase) { if (list) list.innerHTML = '<div class="empty">現場を選択してください</div>'; return; }
+  if (list) list.innerHTML = '<div class="empty">読み込み中...</div>';
+  run('api_getZairyoHokoku', [TOKEN, zhCase, zhWeek], function(r) {
+    if (V !== 'zairyo') return;
+    var list = document.getElementById('zhList');
+    if (!list) return;
+    if (!r || !r.ok) { list.innerHTML = '<div class="empty">' + esc((r && r.error) || 'エラー') + '</div>'; return; }
+    var lbl = document.getElementById('zhWeekLabel');
+    if (lbl) lbl.textContent = '週: ' + r.week + '（' + r.weekLabel + '）';
+    if (!r.items || !r.items.length) {
+      list.innerHTML = '<div style="font-size:12px;color:#8895a2;padding:6px 2px">この現場×週の報告はまだありません</div>';
+      return;
+    }
+    var rows = r.items.map(function(it) {
+      return '<tr><td>' + esc(it.hinmoku) + '</td><td>' + esc(it.qty) + '</td><td>' + esc(it.unit) + '</td>' +
+        '<td>' + esc(it.reporter) + '</td><td>' + esc(it.at) + '</td><td>' + esc(it.memo) + '</td>' +
+        '<td>' + zhPhotoLinks(it.photo) + '</td></tr>';
+    }).join('');
+    list.innerHTML = '<table class="lt"><tr><th>品目</th><th>数量</th><th>単位</th><th>報告者</th><th>報告日時</th><th>メモ</th><th>写真</th></tr>' + rows + '</table>';
+  });
+}
+
+function zhSubmit() {
+  if (!zhCase) { toast('現場を選択してください'); return; }
+  var items = [];
+  document.querySelectorAll('#zhRows .zh-row').forEach(function(row) {
+    var h = row.querySelector('.zh-h'), q = row.querySelector('.zh-q'), u = row.querySelector('.zh-u');
+    if (h && h.value.trim()) {
+      items.push({ hinmoku: h.value.trim(), qty: q ? q.value.trim() : '', unit: u ? u.value.trim() : '' });
+    }
+  });
+  if (!items.length) { toast('品目を1件以上入力してください'); return; }
+  var memoEl = document.getElementById('zhMemo');
+  var btn = document.getElementById('zhSendBtn');
+  if (btn) btn.disabled = true;
+  document.getElementById('busy').style.display = 'block';
+
+  var fail = function(msg) {
+    document.getElementById('busy').style.display = 'none';
+    if (btn) btn.disabled = false;
+    alert(msg || '送信に失敗しました');
+    zhLoad();
+  };
+  var send = function(photos) {
+    gasCall('api_addZairyoHokoku', [TOKEN, zhCase, zhWeek, items, memoEl ? memoEl.value : '', photos || []],
+      function(r) {
+        document.getElementById('busy').style.display = 'none';
+        if (btn) btn.disabled = false;
+        toast((r && r.added ? r.added : items.length) + '品目を報告しました' +
+          (r && r.photos ? '（写真' + r.photos + '枚）' : ''));
+        var rowsEl = document.getElementById('zhRows');
+        if (rowsEl) { rowsEl.innerHTML = ''; zhAddRow(); zhAddRow(); zhAddRow(); }
+        if (memoEl) memoEl.value = '';
+        zhPhotos = [];
+        zhDrawPhotoList();
+        zhLoad();
+      },
+      function(e) { fail(e && e.message ? e.message : '送信に失敗しました'); });
+  };
+
+  if (zhPhotos.length) {
+    readFilesB64(zhPhotos, function(out, failName) {
+      if (!out) { fail('写真の読み込みに失敗しました: ' + (failName || '')); return; }
+      send(out);
+    });
+  } else {
+    send([]);
+  }
+}
+
+/* =========================================================
+   経費申請タブ（P3c・バッチ5で「経費報告」から改名＋領収書添付）
+========================================================= */
+var keihiReceipts = [];  // 添付予定の領収書File配列（送信/再描画でクリア）
+
+function keihiFormHtml() {
+  var d = new Date();
+  var today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return '<div class="sec"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">経費を申請する</h4>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+        '<input type="date" id="keihiDate" class="fsort" value="' + today + '">' +
+        '<input type="number" id="keihiAmount" class="fsort" placeholder="金額（円）" style="width:110px">' +
+        '<input id="keihiMemo" class="fsort" placeholder="内容（例: ガソリン代）" style="width:180px">' +
+        '<input id="keihiGenba" class="fsort" placeholder="現場（任意）" style="width:140px">' +
+        '<button class="btn save" id="keihiSendBtn" style="flex:none;padding:8px 18px" onclick="keihiSubmit()">申請</button>' +
+      '</div>' +
+      '<div style="margin-top:8px;max-width:420px">' +
+        '<a class="addr-link" onclick="document.getElementById(\'keihiFileInput\').click()">📷 領収書を添付（画像・PDF・' + UP_MAX_FILES + '枚まで）</a>' +
+        '<input type="file" id="keihiFileInput" accept="image/*,application/pdf,.pdf,.heic" multiple style="display:none" onchange="keihiFilesChanged(this)">' +
+        '<div id="keihiFileList" style="margin-top:4px"></div>' +
+      '</div>' +
+      '<p style="font-size:10.5px;color:#8895a2;margin-top:6px">領収書は写真かPDFで添付してください（原本の保管は会社のルールに従ってください）。承認・振込の処理は会社側で行います。</p></div>';
+}
+
+function renderKeihi() {
+  keihiReceipts = [];
+  var el = document.getElementById('view');
+  if (B.keihiAccess === 'admin') {
+    // 管理者＝社員と同じ画面（フォーム＋自分の一覧）＋管理者用の全員一覧（CEO指示 2026-10-13）
+    el.innerHTML = '<div class="tbl-wrap">' + keihiFormHtml() +
+      '<div class="sec"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">自分の申請一覧</h4>' +
+        '<div id="keihiList"><div class="empty">読み込み中...</div></div></div>' +
+      '<div class="sec"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">【管理者】全員の申請一覧（状態変更は💼経費承認タブで）</h4>' +
+        '<div id="keihiBody"><div class="empty">読み込み中...</div></div></div></div>';
+    keihiLoadMine();
+    run('api_getKeihiAdmin', [TOKEN], function(r) { if (V === 'keihi') drawKeihiAdmin(r); });
+    return;
+  }
+  el.innerHTML =
+    '<div class="tbl-wrap">' + keihiFormHtml() +
+    '<div class="sec"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">自分の申請一覧</h4>' +
+      '<div id="keihiList"><div class="empty">読み込み中...</div></div></div>' +
+    '</div>';
+  keihiLoadMine();
+}
+
+/* ---- 経費申請: 領収書添付（バッチ5） ---- */
+function keihiFilesChanged(input) {
+  var files = Array.prototype.slice.call(input.files || []);
+  for (var i = 0; i < files.length; i++) {
+    if (keihiReceipts.length >= UP_MAX_FILES) { toast('領収書は' + UP_MAX_FILES + '枚までです'); break; }
+    var err = upFileOk(files[i]);
+    if (err) { toast(err); continue; }
+    keihiReceipts.push(files[i]);
+  }
+  input.value = '';
+  keihiDrawFileList();
+}
+function keihiRemoveFile(i) { keihiReceipts.splice(i, 1); keihiDrawFileList(); }
+function keihiDrawFileList() {
+  var el = document.getElementById('keihiFileList');
+  if (el) el.innerHTML = upFileListHtml(keihiReceipts, 'keihiRemoveFile');
+}
+
+// 写真リンク列G（カンマ区切りURL）→ 📄1 📄2 ... のリンク列HTML
+function keihiPhotoLinks(photo) {
+  if (!photo) return '<span style="color:#99a">—</span>';
+  return String(photo).split(',').map(function(u, i) {
+    u = u.trim(); if (!u) return '';
+    return '<a href="' + esc(u) + '" target="_blank" style="white-space:nowrap">📄' + (i + 1) + '</a>';
+  }).filter(Boolean).join(' ');
+}
+
+function keihiStatusChip(status) {
+  var color = { '確認中': '#a05a00;background:#fdf3e3', '承認': '#1a5ca0;background:#e8f3fe',
+                '振込済': '#2e7d32;background:#e8f5e9', '差戻': '#a02020;background:#fde8e8',
+                '取消': '#667;background:#eceff2' }[status] || '#667;background:#eceff2';
+  return '<span style="font-size:10.5px;padding:1px 8px;border-radius:10px;white-space:nowrap;color:' + color + '">' + esc(status) + '</span>';
+}
+
+function keihiLoadMine() {
+  run('api_getMyKeihi', [TOKEN], function(r) {
+    if (V !== 'keihi') return;
+    var list = document.getElementById('keihiList');
+    if (!list) return;
+    if (!r || !r.ok) { list.innerHTML = '<div class="empty">' + esc((r && r.error) || 'エラー') + '</div>'; return; }
+    if (!r.items || !r.items.length) { list.innerHTML = '<div class="empty">申請はまだありません</div>'; return; }
+    var rows = r.items.map(function(it) {
+      return '<tr><td>' + esc(it.date) + '</td><td style="text-align:right">' + Number(it.amount || 0).toLocaleString() + '円</td>' +
+        '<td>' + esc(it.memo) + '</td><td>' + keihiPhotoLinks(it.photo) + '</td>' +
+        '<td>' + keihiStatusChip(it.status) + '</td><td>' + esc(it.submitted) + '</td></tr>';
+    }).join('');
+    list.innerHTML = '<table class="lt"><tr><th>日付</th><th>金額</th><th>内容</th><th>領収書</th><th>状態</th><th>提出日</th></tr>' + rows + '</table>';
+  });
+}
+
+function keihiSubmit() {
+  var date = (document.getElementById('keihiDate') || {}).value || '';
+  var amount = (document.getElementById('keihiAmount') || {}).value || '';
+  var memo = (document.getElementById('keihiMemo') || {}).value || '';
+  var genba = (document.getElementById('keihiGenba') || {}).value || '';
+  if (!date || !amount) { toast('日付と金額を入力してください'); return; }
+  var btn = document.getElementById('keihiSendBtn');
+  if (btn) btn.disabled = true;
+  document.getElementById('busy').style.display = 'block';
+
+  var fail = function(msg) {
+    document.getElementById('busy').style.display = 'none';
+    if (btn) btn.disabled = false;
+    toast('エラー: ' + (msg || '申請に失敗しました'));
+  };
+  var send = function(receipts) {
+    gasCall('api_submitKeihi', [TOKEN, { date: date, amount: amount, memo: memo, genba: genba, receipts: receipts || [] }],
+      function(r) {
+        document.getElementById('busy').style.display = 'none';
+        if (btn) btn.disabled = false;
+        toast('経費を申請しました（状態: 確認中' + (receipts && receipts.length ? '・領収書' + receipts.length + '枚' : '') + '）');
+        var a = document.getElementById('keihiAmount'); if (a) a.value = '';
+        var m = document.getElementById('keihiMemo'); if (m) m.value = '';
+        var g = document.getElementById('keihiGenba'); if (g) g.value = '';
+        keihiReceipts = [];
+        keihiDrawFileList();
+        keihiLoadMine();
+      },
+      function(e) { fail(e && e.message ? e.message : '申請に失敗しました'); });
+  };
+
+  if (keihiReceipts.length) {
+    readFilesB64(keihiReceipts, function(out, failName) {
+      if (!out) { fail('領収書の読み込みに失敗しました: ' + (failName || '')); return; }
+      send(out);
+    });
+  } else {
+    send([]);
+  }
+}
+
+function drawKeihiAdmin(r) {
+  var body = document.getElementById('keihiBody');
+  if (!body) return;
+  if (!r || !r.ok) { body.innerHTML = '<div class="empty">' + esc((r && r.error) || 'エラー') + '</div>'; return; }
+  var note = '<p style="font-size:11px;color:#8895a2;margin-bottom:8px">全員の申請一覧（閲覧のみ）。承認・振込済などの状態変更は「💼 経費承認」タブで行えます。</p>';
+  if (!r.items || !r.items.length) { body.innerHTML = note + '<div class="empty">申請はまだありません</div>'; return; }
+  var rows = r.items.map(function(it) {
+    return '<tr><td>' + esc(it.submitted) + '</td><td><b>' + esc(it.name) + '</b></td><td>' + esc(it.date) + '</td>' +
+      '<td style="text-align:right">' + Number(it.amount || 0).toLocaleString() + '円</td>' +
+      '<td>' + esc(it.memo) + '</td><td>' + keihiPhotoLinks(it.photo) + '</td>' +
+      '<td>' + keihiStatusChip(it.status) + '</td><td>' + esc(it.done) + '</td></tr>';
+  }).join('');
+  body.innerHTML = note + '<table class="lt"><tr><th>提出日</th><th>氏名</th><th>日付</th><th>金額</th><th>内容</th><th>領収書</th><th>状態</th><th>処理日</th></tr>' + rows + '</table>';
+}
+
+/* =========================================================
+   経費承認タブ（管理者専用・2026-10-12夜 CEO指示）
+   全申請一覧＋各行の状態変更。サーバ側 api_setKeihiStatus は
+   ホワイトリスト（確認中/承認/振込済/差戻/取消）のみ受け付ける
+========================================================= */
+var keihiAdminCache = [];
+var KEIHI_STATUS_LIST = ['確認中', '承認', '振込済', '差戻', '取消'];
+
+function renderKeihiApproval() {
+  var el = document.getElementById('view');
+  el.innerHTML = '<div class="tbl-wrap" id="keihiAdmBody"><div class="empty">読み込み中...</div></div>';
+  run('api_getKeihiAdmin', [TOKEN], function(r) { if (V === 'keihiadmin') drawKeihiApproval(r); });
+}
+
+function drawKeihiApproval(r) {
+  var body = document.getElementById('keihiAdmBody');
+  if (!body) return;
+  if (!r || !r.ok) { body.innerHTML = '<div class="empty">' + esc((r && r.error) || 'エラー') + '</div>'; return; }
+  keihiAdminCache = r.items || [];
+  var note = '<p style="font-size:11px;color:#8895a2;margin-bottom:8px">状態を選んで「変更」を押すと経費精算シートに即反映されます。' +
+    '残タスク連携（毎時）もそのまま追従します（確認中・承認=タスク化／振込済・差戻・取消=タスク削除）。</p>';
+  if (!keihiAdminCache.length) { body.innerHTML = note + '<div class="empty">申請はまだありません</div>'; return; }
+  var rows = keihiAdminCache.map(function(it, i) {
+    var opts = KEIHI_STATUS_LIST.map(function(s) {
+      return '<option' + (s === it.status ? ' selected' : '') + '>' + s + '</option>';
+    }).join('');
+    return '<tr><td>' + esc(it.submitted) + '</td><td><b>' + esc(it.name) + '</b></td><td>' + esc(it.date) + '</td>' +
+      '<td style="text-align:right">' + Number(it.amount || 0).toLocaleString() + '円</td>' +
+      '<td>' + esc(it.memo) + '</td><td>' + keihiPhotoLinks(it.photo) + '</td>' +
+      '<td>' + keihiStatusChip(it.status) + '</td>' +
+      '<td style="white-space:nowrap"><select class="fsort" id="ksSel_' + i + '">' + opts + '</select> ' +
+      '<span class="chipbtn" onclick="keihiSetStatus(' + i + ')">変更</span></td></tr>';
+  }).join('');
+  body.innerHTML = note + '<table class="lt"><tr><th>提出日</th><th>氏名</th><th>日付</th><th>金額</th><th>内容</th><th>領収書</th><th>状態</th><th>状態変更</th></tr>' + rows + '</table>';
+}
+
+function keihiSetStatus(i) {
+  var it = keihiAdminCache[i];
+  if (!it) return;
+  var sel = document.getElementById('ksSel_' + i);
+  var st = sel ? sel.value : '';
+  if (!st || st === it.status) { toast('状態が変わっていません'); return; }
+  if (!window.confirm(it.name + ' ' + it.date + ' ' + Number(it.amount || 0).toLocaleString() + '円 を「' + st + '」に変更しますか？')) return;
+  run('api_setKeihiStatus', [TOKEN, it.key, st], function(r) {
+    if (r && r.ok === false) { toast('エラー: ' + (r.error || '変更できませんでした')); return; }
+    toast('「' + st + '」に変更しました');
+    renderKeihiApproval();
+  });
+}
+
+/* =========================================================
+   初期化
+   - ?k あり: 従来どおり（LIFFは一切動かない）
+   - ?k なし: まず空トークンで従来認証（Google管理者セッション）を試し、
+     不許可なら LIFF_ID 設定時のみ LINEログインへフォールバック
+========================================================= */
+run('api_bootstrap', [TOKEN], function(r) {
+  if (r && r.authorized) { applyBootstrap(r); return; }
+  if (!TOKEN && LIFF_ID) { startLiffFlow(); return; }
+  B = r;
+  showDenied();
+});
+</script>
+</body></html>
