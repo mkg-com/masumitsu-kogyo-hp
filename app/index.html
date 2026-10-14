@@ -2654,9 +2654,16 @@ function renderZairyoHokoku() {
     return '<option value="' + esc(c['案件ID']) + '"' + (c['案件ID'] === zhCase ? ' selected' : '') + '>' + esc(label) + '</option>';
   }).join('');
 
+  // 材料表テンプレート（現場未選択でも常時表示・タップで開いて印刷。バッチ7）
+  var tplHtml = B.zairyoTemplateUrl
+    ? '<div class="sec" style="margin-bottom:10px"><a href="' + esc(B.zairyoTemplateUrl) + '" target="_blank" style="font-weight:600">' +
+      '📄 材料表テンプレートを開く（A4両面・印刷用）</a>' +
+      '<span style="font-size:10.5px;color:#8895a2;margin-left:8px">開いた画面から印刷できます</span></div>'
+    : '';
+
   var el = document.getElementById('view');
   el.innerHTML =
-    '<div class="tbl-wrap">' +
+    '<div class="tbl-wrap">' + tplHtml +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">' +
       '<select class="fsort" style="max-width:100%" onchange="zhCase=this.value;zhLoad()">' + caseOpts + '</select>' +
       '<span class="chipbtn' + (zhWeek === 'this' ? ' on' : '') + '" onclick="zhSetWeek(\'this\')">今週</span>' +
