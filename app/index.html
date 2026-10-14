@@ -2904,6 +2904,8 @@ function keihiStatusChip(status) {
   return '<span style="font-size:10.5px;padding:1px 8px;border-radius:10px;white-space:nowrap;color:' + color + '">' + esc(status) + '</span>';
 }
 
+var keihiMine = []; // 自分の申請一覧（取消ボタンの行特定キー保持用・バッチ6）
+
 function keihiLoadMine() {
   run('api_getMyKeihi', [TOKEN], function(r) {
     if (V !== 'keihi') return;
@@ -2911,13 +2913,36 @@ function keihiLoadMine() {
     if (!list) return;
     if (!r || !r.ok) { list.innerHTML = '<div class="empty">' + esc((r && r.error) || 'エラー') + '</div>'; return; }
     if (!r.items || !r.items.length) { list.innerHTML = '<div class="empty">申請はまだありません</div>'; return; }
-    var rows = r.items.map(function(it) {
+    keihiMine = r.items;
+    var rows = r.items.map(function(it, i) {
+      // 取消は「確認中」のみ（承認以降は会社に連絡・バッチ6）
+      var cancelBtn = (it.status === '確認中' && it.key)
+        ? '<a class="addr-link" style="color:#a02020;white-space:nowrap" onclick="keihiCancel(' + i + ')">🗑 取消</a>'
+        : '';
       return '<tr><td>' + esc(it.date) + '</td><td style="text-align:right">' + Number(it.amount || 0).toLocaleString() + '円</td>' +
         '<td>' + esc(it.memo) + '</td><td>' + keihiPhotoLinks(it.photo) + '</td>' +
-        '<td>' + keihiStatusChip(it.status) + '</td><td>' + esc(it.submitted) + '</td></tr>';
+        '<td>' + keihiStatusChip(it.status) + '</td><td>' + esc(it.submitted) + '</td><td>' + cancelBtn + '</td></tr>';
     }).join('');
-    list.innerHTML = '<table class="lt"><tr><th>日付</th><th>金額</th><th>内容</th><th>領収書</th><th>状態</th><th>提出日</th></tr>' + rows + '</table>';
+    list.innerHTML = '<table class="lt"><tr><th>日付</th><th>金額</th><th>内容</th><th>領収書</th><th>状態</th><th>提出日</th><th></th></tr>' + rows + '</table>';
   });
+}
+
+/* ---- 経費申請: 本人取消（バッチ6） ---- */
+function keihiCancel(i) {
+  var it = keihiMine[i];
+  if (!it || !it.key) { toast('対象が特定できません。画面を更新してください'); return; }
+  if (!confirm(it.date + ' ' + Number(it.amount || 0).toLocaleString() + '円「' + (it.memo || '') + '」の申請を取り消しますか？')) return;
+  document.getElementById('busy').style.display = 'block';
+  gasCall('api_cancelMyKeihi', [TOKEN, it.key],
+    function(r) {
+      document.getElementById('busy').style.display = 'none';
+      toast('申請を取り消しました');
+      keihiLoadMine();
+    },
+    function(e) {
+      document.getElementById('busy').style.display = 'none';
+      toast('エラー: ' + (e && e.message ? e.message : '取消に失敗しました'));
+    });
 }
 
 function keihiSubmit() {
