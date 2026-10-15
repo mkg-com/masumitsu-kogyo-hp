@@ -2875,19 +2875,40 @@ function drawKyuyoAdmin(r) {
 /* =========================================================
    材料報告タブ（P3c: 現場×週・差分式）
 ========================================================= */
-var zhCase = '';      // 選択中の案件ID
+var zhCase = '';      // 選択中の現場（スケジュール取引先タイトル。旧データ互換で案件IDも可）
 var zhWeek = 'this';  // 'this' | 'last'
 var zhPhotos = [];    // 添付予定の写真File配列（バッチ5・送信/再描画でクリア）
+var zhGenbaList = null; // バッチ10: スケジュール取引先タイトル一覧（null=未取得・'legacy'=旧案件リストで代替）
 
 function renderZairyoHokoku() {
   zhPhotos = [];
-  var cases = (B.cases || []).filter(function(c) {
-    return c['ステータス'] === '進行中' || c['ステータス'] === '決定';
-  });
-  var caseOpts = '<option value="">現場を選択してください</option>' + cases.map(function(c) {
-    var label = (c['取引先'] ? c['取引先'] + '｜' : '') + (c['案件名'] || c['案件ID']);
-    return '<option value="' + esc(c['案件ID']) + '"' + (c['案件ID'] === zhCase ? ' selected' : '') + '>' + esc(label) + '</option>';
-  }).join('');
+  // バッチ10: 現場プルダウンはスケジュール（配置スプシ）の取引先タイトルを使う。
+  // 未取得なら非同期で取得して再描画。取得不可（旧GAS等）は案件リストにフォールバック
+  if (zhGenbaList === null) {
+    zhGenbaList = 'loading';
+    gasCall('api_getZairyoGenba', [TOKEN],
+      function(r) {
+        zhGenbaList = (r && r.ok && r.genba && r.genba.length) ? r.genba : 'legacy';
+        if (V === 'zairyo') render();
+      },
+      function(e) { zhGenbaList = 'legacy'; if (V === 'zairyo') render(); });
+  }
+  var caseOpts;
+  if (Array.isArray(zhGenbaList)) {
+    caseOpts = '<option value="">現場を選択してください</option>' + zhGenbaList.map(function(g) {
+      return '<option value="' + esc(g) + '"' + (g === zhCase ? ' selected' : '') + '>' + esc(g) + '</option>';
+    }).join('');
+  } else if (zhGenbaList === 'loading') {
+    caseOpts = '<option value="">現場リストを読み込み中...</option>';
+  } else {
+    var cases = (B.cases || []).filter(function(c) {
+      return c['ステータス'] === '進行中' || c['ステータス'] === '決定';
+    });
+    caseOpts = '<option value="">現場を選択してください</option>' + cases.map(function(c) {
+      var label = (c['取引先'] ? c['取引先'] + '｜' : '') + (c['案件名'] || c['案件ID']);
+      return '<option value="' + esc(c['案件ID']) + '"' + (c['案件ID'] === zhCase ? ' selected' : '') + '>' + esc(label) + '</option>';
+    }).join('');
+  }
 
   // 材料表テンプレート（現場未選択でも常時表示・タップで開いて印刷。バッチ7）
   var tplHtml = B.zairyoTemplateUrl
