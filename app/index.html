@@ -2879,6 +2879,7 @@ var zhCase = '';      // 選択中の現場（スケジュール取引先タイ�
 var zhWeek = 'this';  // 'this' | 'last'
 var zhPhotos = [];    // 添付予定の写真File配列（バッチ5・送信/再描画でクリア）
 var zhGenbaList = null; // バッチ10: スケジュール取引先タイトル一覧（null=未取得・'legacy'=旧案件リストで代替）
+var zhManualOn = false; // バッチ10.1: 「その他（手入力）」選択中か（見積段階の材料など）
 
 function renderZairyoHokoku() {
   zhPhotos = [];
@@ -2895,9 +2896,12 @@ function renderZairyoHokoku() {
   }
   var caseOpts;
   if (Array.isArray(zhGenbaList)) {
+    // 手入力中は選択肢に無い現場名が zhCase に入るため「その他」を選択状態にする（バッチ10.1）
+    var isManual = zhManualOn || (zhCase && zhGenbaList.indexOf(zhCase) < 0);
     caseOpts = '<option value="">現場を選択してください</option>' + zhGenbaList.map(function(g) {
-      return '<option value="' + esc(g) + '"' + (g === zhCase ? ' selected' : '') + '>' + esc(g) + '</option>';
-    }).join('');
+      return '<option value="' + esc(g) + '"' + (!isManual && g === zhCase ? ' selected' : '') + '>' + esc(g) + '</option>';
+    }).join('') +
+    '<option value="__manual__"' + (isManual ? ' selected' : '') + '>✏️ その他（現場名を手入力）</option>';
   } else if (zhGenbaList === 'loading') {
     caseOpts = '<option value="">現場リストを読み込み中...</option>';
   } else {
@@ -2921,7 +2925,11 @@ function renderZairyoHokoku() {
   el.innerHTML =
     '<div class="tbl-wrap">' + tplHtml +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">' +
-      '<select class="fsort" style="max-width:100%" onchange="zhCase=this.value;zhLoad()">' + caseOpts + '</select>' +
+      '<select class="fsort" style="max-width:100%" onchange="zhSelGenba(this.value)">' + caseOpts + '</select>' +
+      '<span id="zhManualWrap" style="display:' + ((zhManualOn || (Array.isArray(zhGenbaList) && zhCase && zhGenbaList.indexOf(zhCase) < 0)) ? '' : 'none') + '">' +
+        '<input id="zhManualInput" class="fsort" placeholder="現場名を入力（例: ○○工場 見積用）" style="width:220px;max-width:100%"' +
+        ' value="' + esc(zhManualOn || (Array.isArray(zhGenbaList) && zhGenbaList.indexOf(zhCase) < 0) ? zhCase : '') + '" onchange="zhManualCommit(this.value)">' +
+      '</span>' +
       '<span class="chipbtn' + (zhWeek === 'this' ? ' on' : '') + '" onclick="zhSetWeek(\'this\')">今週</span>' +
       '<span class="chipbtn' + (zhWeek === 'last' ? ' on' : '') + '" onclick="zhSetWeek(\'last\')">先週</span>' +
       '<span id="zhWeekLabel" style="font-size:11.5px;color:#8895a2"></span>' +
@@ -2988,6 +2996,32 @@ function zhLoadFiles() {
         '<a href="' + esc(f.url) + '" target="_blank">' + icon + ' ' + esc(f.name) + '</a></div>';
     }).join('');
   });
+}
+
+/* バッチ10.1: 現場プルダウン選択（「その他」で手入力欄を表示） */
+function zhSelGenba(v) {
+  if (v === '__manual__') {
+    zhManualOn = true; zhCase = '';
+    var w = document.getElementById('zhManualWrap');
+    if (w) w.style.display = '';
+    var li = document.getElementById('zhList');
+    if (li) li.innerHTML = '<div class="empty">現場名を入力してください</div>';
+    zhLoadFiles(); // 現場未確定なので資料セクションを隠す
+    var inp = document.getElementById('zhManualInput');
+    if (inp) { inp.value = ''; inp.focus(); }
+    return;
+  }
+  zhManualOn = false; zhCase = v;
+  var w2 = document.getElementById('zhManualWrap');
+  if (w2) w2.style.display = 'none';
+  zhLoad();
+}
+
+/* バッチ10.1: 手入力の現場名を確定（blur/Enter） */
+function zhManualCommit(v) {
+  v = String(v || '').trim();
+  zhCase = v;
+  if (v) zhLoad();
 }
 
 function zhSetWeek(w) { zhWeek = w; render(); }
