@@ -275,6 +275,19 @@ table.lt { border-collapse:collapse; width:100%; background:#fff; border-radius:
 .q-wrap .lucide { position:absolute; left:9px; width:15px; height:15px; color:#90caf9; pointer-events:none; }
 .q-wrap #q { margin-left:0; padding-left:30px; }
 
+/* ---- バッチ13: 電動工具管理 ---- */
+.kogu-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:9px; padding:12px 16px; }
+.kogu-card { background:#fff; border-radius:10px; padding:10px 11px; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+.kogu-card.out { background:#fdf8ef; }
+.kogu-name { font-size:13px; font-weight:bold; color:#1565c0; margin-bottom:7px; }
+.kogu-btns { display:flex; gap:6px; }
+.kogu-btn { flex:1; padding:9px 4px; min-height:40px; border-radius:8px; border:1px solid #d5dce2; background:#fff; color:#667; font-size:12px; cursor:pointer; }
+.kogu-btn.on-office { background:#2e7d32; border-color:#2e7d32; color:#fff; font-weight:bold; }
+.kogu-btn.on-out { background:#e8a33d; border-color:#e8a33d; color:#fff; font-weight:bold; }
+.kogu-btn[disabled] { cursor:default; }
+.kogu-meta { font-size:10.5px; color:#8895a2; margin-top:6px; min-height:14px; }
+@media (max-width:600px){ .kogu-grid { grid-template-columns:repeat(2,1fr); padding:10px; } }
+
 /* ---- UI改善バッチ8: 空状態（empty state） ---- */
 .empty-state { text-align:center; padding:48px 20px 56px; color:#667; }
 .empty-state svg { width:180px; max-width:60vw; height:auto; margin-bottom:18px; }
@@ -568,6 +581,7 @@ function setupNav() {
     if (B.kyuyoAccess && B.kyuyoAccess !== 'none') addTab('kyuyo', '給与明細', 'receipt-japanese-yen');
     if (B.zairyoAllowed) addTab('zairyo', '材料報告', 'package');
     if (B.keihiAccess && B.keihiAccess !== 'none') addTab('keihi', '経費申請', 'wallet');
+    addTab('kogu', '工具管理', 'wrench'); // バッチ13: 電動工具の持出管理（L0〜L2b）
     addTab('board', '進行ボード', 'square-kanban');
     addTab('search', '検索', 'search');
     addTab('done', '完了アーカイブ', 'archive');
@@ -1411,6 +1425,7 @@ function render() {
   else if (V === 'kyuyo') { renderKyuyo(); }
   else if (V === 'zairyo') { renderZairyoHokoku(); }
   else if (V === 'keihi') { renderKeihi(); }
+  else if (V === 'kogu') { renderKogu(); }
   else if (V === 'keihiadmin') { renderKeihiApproval(); }
   else if (V === 'log') {
     el.innerHTML = '<div class="skel-wrap"><div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div></div>';
@@ -3119,6 +3134,72 @@ function zhSubmit() {
   } else {
     send([]);
   }
+}
+
+/* =========================================================
+   電動工具管理タブ（バッチ13・2026-10-17 CEO指示）
+   工具一覧はスプシ「工具マスタ」が正本（行の追加・変更がそのまま反映）。
+   事務所/持出中ボタンで状態変更し、誰がいつ押したかを履歴に全記録。
+========================================================= */
+function renderKogu() {
+  var el = document.getElementById('view');
+  el.innerHTML = '<div class="skel-wrap"><div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div></div>';
+  gasCall('api_getKogu', [TOKEN],
+    function(r) { if (V === 'kogu') drawKogu(r); },
+    function(e) {
+      if (V !== 'kogu') return;
+      document.getElementById('view').innerHTML =
+        '<div class="empty">工具リストを取得できませんでした（' + esc(e && e.message ? e.message : '') + '）</div>';
+    });
+}
+
+function drawKogu(r) {
+  var el = document.getElementById('view');
+  if (!r || !r.ok || !r.tools) { el.innerHTML = '<div class="empty">工具リストを取得できませんでした</div>'; return; }
+  var cards = r.tools.map(function(t) {
+    var out = t.state === '持出中';
+    var meta = out
+      ? esc((t.who || '不明') + ' が持出中' + (t.at ? '（' + t.at + '）' : ''))
+      : (t.who ? esc(t.who + ' が返却' + (t.at ? '（' + t.at + '）' : '')) : '');
+    return '<div class="kogu-card' + (out ? ' out' : '') + '">' +
+      '<div class="kogu-name">' + esc(t.name) + '</div>' +
+      '<div class="kogu-btns">' +
+        '<button class="kogu-btn' + (!out ? ' on-office' : '') + '"' + (!out ? ' disabled' : '') +
+          ' onclick="koguSet(\'' + esc(t.name) + '\',\'事務所\')">事務所</button>' +
+        '<button class="kogu-btn' + (out ? ' on-out' : '') + '"' + (out ? ' disabled' : '') +
+          ' onclick="koguSet(\'' + esc(t.name) + '\',\'持出中\')">持出中</button>' +
+      '</div>' +
+      '<div class="kogu-meta">' + meta + '</div></div>';
+  }).join('');
+  var histRows = (r.hist || []).map(function(h) {
+    return '<tr><td>' + esc(h.at) + '</td><td><b>' + esc(h.name) + '</b></td><td>' + esc(h.state) + '</td><td>' + esc(h.who) + '</td></tr>';
+  }).join('');
+  var outCnt = r.tools.filter(function(t) { return t.state === '持出中'; }).length;
+  el.innerHTML =
+    '<div class="toolbar"><span style="font-size:12px;color:#556">持出中: <b style="color:#a05a00">' + outCnt + '</b> / ' + r.tools.length + '点</span>' +
+    '<span class="sync-info"><button class="sync-btn" title="再取得" onclick="renderKogu()"><i data-lucide="refresh-cw"></i></button></span></div>' +
+    '<div class="kogu-grid">' + cards + '</div>' +
+    (histRows
+      ? '<div class="tbl-wrap"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">直近の操作履歴（20件）</h4>' +
+        '<table class="lt"><tr><th>日時</th><th>工具</th><th>操作</th><th>操作者</th></tr>' + histRows + '</table></div>'
+      : '');
+  icons();
+}
+
+function koguSet(name, state) {
+  document.getElementById('busy').style.display = 'block';
+  gasCall('api_setKogu', [TOKEN, name, state],
+    function(r) {
+      document.getElementById('busy').style.display = 'none';
+      if (r && r.unchanged) { toast('すでに「' + state + '」です'); return; }
+      showToast(name + ' を「' + state + '」にしました ✓');
+      if (V === 'kogu') renderKogu();
+    },
+    function(e) {
+      document.getElementById('busy').style.display = 'none';
+      toast('エラー: ' + (e && e.message ? e.message : '変更できませんでした'));
+      if (V === 'kogu') renderKogu();
+    });
 }
 
 /* =========================================================
