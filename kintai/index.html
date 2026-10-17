@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>出勤報告（中川）</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:"Noto Sans JP","Yu Gothic","Hiragino Sans",Meiryo,sans-serif; }
+body { background:#f4f5f7; min-height:100vh; }
+.bar { background:#1565c0; color:#fff; padding:14px 18px; font-weight:bold; font-size:16px; }
+.wrap { max-width:460px; margin:0 auto; padding:16px; }
+.card { background:#fff; border-radius:12px; padding:18px 16px; box-shadow:0 1px 4px rgba(0,0,0,.12); margin-bottom:14px; }
+label { display:block; font-size:12.5px; color:#556; margin-bottom:12px; }
+input { width:100%; border:1px solid #d5dce2; border-radius:8px; padding:12px 10px; font-size:16px; margin-top:4px; }
+input:focus { outline:2px solid #1976d2; border-color:#1976d2; }
+.btn { width:100%; background:#1976d2; color:#fff; border:none; border-radius:10px; padding:16px; font-size:17px; font-weight:bold; cursor:pointer; }
+.btn:disabled { opacity:.5; }
+.note { font-size:10.5px; color:#8895a2; margin-top:8px; line-height:1.6; }
+h4 { font-size:11px; color:#8895a2; margin-bottom:8px; }
+table { border-collapse:collapse; width:100%; }
+th { background:#1565c0; color:#fff; font-size:11px; padding:6px 9px; text-align:left; font-weight:normal; }
+td { border-bottom:1px solid #eef1f4; font-size:12.5px; padding:6px 9px; color:#334; }
+#toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1565c0; color:#fff; padding:11px 22px; border-radius:22px; font-size:13px; display:none; white-space:nowrap; box-shadow:0 4px 14px rgba(0,0,0,.25); }
+.empty { color:#99a; font-size:12.5px; padding:14px; text-align:center; }
+</style></head><body>
+<div class="bar">出勤報告（中川）</div>
+<div class="wrap">
+  <div class="card">
+    <label>日付（忘れた日は変更して後から入力できます）
+      <input type="date" id="d">
+    </label>
+    <label>残業時間（残業したときだけ数字を入力・例: 1.5）
+      <input type="number" id="ot" min="0" max="24" step="0.5" placeholder="なし">
+    </label>
+    <button class="btn" id="btn" onclick="send()">出勤</button>
+    <p class="note">同じ日付でもう一度押すと上書きされます（残業時間の修正にも使えます）。</p>
+  </div>
+  <div class="card"><h4>直近の記録</h4><div id="list"><div class="empty">読み込み中...</div></div></div>
+</div>
+<div id="toast"></div>
+<script>
+var GAS = 'https://script.google.com/macros/s/AKfycbzIWebX8KOXRpoaDBBrkL1RkF19rVyYfAxIfECRjimkpO4cxDoCnssVAaR1a4i_wWotUw/exec';
+var K = new URLSearchParams(location.search).get('k') || '';
+document.getElementById('d').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+
+function toast(m) {
+  var t = document.getElementById('toast');
+  t.textContent = m; t.style.display = 'block';
+  clearTimeout(toast._t); toast._t = setTimeout(function() { t.style.display = 'none'; }, 2200);
+}
+function call(payload, ok, ng) {
+  fetch(GAS, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(j) { if (j && j.ok) ok(j); else ng(new Error((j && j.error) || '不明なエラー')); })
+    .catch(function(e) { ng(e); });
+}
+function load() {
+  call({ fn: 'get', k: K }, function(j) {
+    var el = document.getElementById('list');
+    if (!j.items || !j.items.length) { el.innerHTML = '<div class="empty">記録はまだありません</div>'; return; }
+    el.innerHTML = '<table><tr><th>日付</th><th>出勤</th><th>残業</th></tr>' + j.items.map(function(it) {
+      return '<tr><td>' + it.date + '</td><td>出勤</td><td>' + (it.overtime !== '' ? it.overtime + ' h' : '—') + '</td></tr>';
+    }).join('') + '</table>';
+  }, function(e) {
+    document.getElementById('list').innerHTML = '<div class="empty">' + (e && e.message ? e.message : 'エラー') + '</div>';
+  });
+}
+function send() {
+  var d = document.getElementById('d').value;
+  var ot = document.getElementById('ot').value;
+  if (!d) { toast('日付を選択してください'); return; }
+  var b = document.getElementById('btn'); b.disabled = true;
+  call({ fn: 'set', k: K, date: d, overtime: ot }, function(j) {
+    b.disabled = false;
+    toast(d + ' 出勤を記録しました' + (ot ? '（残業' + ot + 'h）' : '') + (j.updated ? '（上書き）' : ''));
+    document.getElementById('ot').value = '';
+    load();
+  }, function(e) {
+    b.disabled = false;
+    toast('エラー: ' + (e && e.message ? e.message : '記録できませんでした'));
+  });
+}
+if (!K) { document.body.innerHTML = '<p style="padding:30px;font-family:sans-serif">アクセスできません。配布された専用URLから開いてください。</p>'; }
+else { load(); }
+</script>
+</body></html>
