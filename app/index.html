@@ -565,9 +565,9 @@ function setupNav() {
   }
   // L3（協力会社）: 外注予定＋配車表のみの限定ナビ（バッチ4・2026-10-13）
   if (B.isL3) {
+    // L3は外注予定のみ（配車表は2026-10-17 CEO指示で非公開化）
     addTab('gaichu', '外注予定', 'users');
-    addTab('haisha', '配車表', 'truck');
-    if (V !== 'gaichu' && V !== 'haisha') V = 'gaichu';
+    V = 'gaichu';
     document.getElementById('q').style.display = 'none';
     document.getElementById('newBtn').style.display = 'none';
   } else {
