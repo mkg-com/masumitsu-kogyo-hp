@@ -3199,11 +3199,11 @@ function renderNissan() {
   gasCall('api_getFiles', [TOKEN, NISSAN_ANKEN_ID],
     function(r) {
       if (V !== 'nissan') return;
-      if (!r || !r.ok || !r.result || r.result.length === 0) {
+      if (!r || !Array.isArray(r) || r.length === 0) {
         el.innerHTML = '<div class="empty">添付ファイルがありません</div>';
         return;
       }
-      var rows = r.result.map(function(f) {
+      var rows = r.map(function(f) {
         var label = esc(f.name.replace(/^\[[^\]]*\]/, '')); // [タグ]を除いた表示名
         return '<li class="file-item"><a href="' + esc(f.url) + '" target="_blank" rel="noopener">' +
           '<i data-lucide="file-text"></i><span>' + label + '</span></a></li>';
