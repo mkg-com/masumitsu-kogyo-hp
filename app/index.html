@@ -582,6 +582,7 @@ function setupNav() {
     if (B.zairyoAllowed) addTab('zairyo', '材料報告', 'package');
     if (B.keihiAccess && B.keihiAccess !== 'none') addTab('keihi', '経費申請', 'wallet');
     addTab('kogu', '工具管理', 'wrench'); // バッチ13: 電動工具の持出管理（L0〜L2b）
+    addTab('nissan', '日産作業届', 'hard-hat');
     addTab('board', '進行ボード', 'square-kanban');
     addTab('search', '検索', 'search');
     addTab('done', '完了アーカイブ', 'archive');
@@ -1426,6 +1427,7 @@ function render() {
   else if (V === 'zairyo') { renderZairyoHokoku(); }
   else if (V === 'keihi') { renderKeihi(); }
   else if (V === 'kogu') { renderKogu(); }
+  else if (V === 'nissan') { renderNissan(); }
   else if (V === 'keihiadmin') { renderKeihiApproval(); }
   else if (V === 'log') {
     el.innerHTML = '<div class="skel-wrap"><div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div></div>';
@@ -3184,6 +3186,38 @@ function drawKogu(r) {
         '<table class="lt"><tr><th>日時</th><th>工具</th><th>操作</th><th>操作者</th></tr>' + histRows + '</table></div>'
       : '');
   icons();
+}
+
+/* =========================================================
+   日産作業届タブ（2026-10-23 CEO指示）
+   M-2026-023「日産作業届」に添付された作業届PDFをリスト表示。
+========================================================= */
+function renderNissan() {
+  var NISSAN_ANKEN_ID = 'M-2026-023';
+  var el = document.getElementById('view');
+  el.innerHTML = '<div class="skel-wrap"><div class="skel skel-card"></div><div class="skel skel-card"></div></div>';
+  gasCall('api_getFiles', [TOKEN, NISSAN_ANKEN_ID],
+    function(r) {
+      if (V !== 'nissan') return;
+      if (!r || !r.ok || !r.files || r.files.length === 0) {
+        el.innerHTML = '<div class="empty">添付ファイルがありません</div>';
+        return;
+      }
+      var rows = r.files.map(function(f) {
+        var label = esc(f.name.replace(/^\[[^\]]*\]/, '')); // [タグ]を除いた表示名
+        return '<li class="file-item"><a href="' + esc(f.url) + '" target="_blank" rel="noopener">' +
+          '<i data-lucide="file-text"></i><span>' + label + '</span></a></li>';
+      }).join('');
+      el.innerHTML =
+        '<div class="toolbar"><span style="font-size:12px;color:#556">作業届一覧</span>' +
+        '<span class="sync-info"><button class="sync-btn" title="再取得" onclick="renderNissan()"><i data-lucide="refresh-cw"></i></button></span></div>' +
+        '<ul class="file-list">' + rows + '</ul>';
+      icons();
+    },
+    function(e) {
+      if (V !== 'nissan') return;
+      el.innerHTML = '<div class="empty">取得できませんでした（' + esc(e && e.message ? e.message : String(e)) + '）</div>';
+    });
 }
 
 function koguSet(name, state) {
