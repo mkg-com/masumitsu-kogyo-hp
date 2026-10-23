@@ -3470,11 +3470,17 @@ function keihiSetStatus(i) {
      不許可なら LIFF_ID 設定時のみ LINEログインへフォールバック
 ========================================================= */
 icons(); // トップバーの静的アイコンを初期反映（バッチ8）
-run('api_bootstrap', [TOKEN], function(r) {
+document.getElementById('busy').style.display = 'block';
+gasCall('api_bootstrap', [TOKEN], function(r) {
+  document.getElementById('busy').style.display = 'none';
   if (r && r.authorized) { applyBootstrap(r); return; }
-  if (!TOKEN && LIFF_ID) { startLiffFlow(); return; }
-  B = r;
-  showDenied();
+  if (LIFF_ID) { startLiffFlow(); return; }  // 未認証・期限切れともLINEログインへ
+  B = r; showDenied();
+}, function(e) {
+  document.getElementById('busy').style.display = 'none';
+  if (LIFF_ID) { startLiffFlow(); return; }  // エラー時もLINEログインへ誘導
+  document.getElementById('view').innerHTML = authHero() +
+    '<div class="denied"><h2>増光工業社内ポータル</h2><p>' + esc(e && e.message ? e.message : 'エラーが発生しました') + '</p></div>';
 });
 </script>
 </body></html>
