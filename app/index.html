@@ -565,8 +565,8 @@ function setupNav() {
   }
   // L3（協力会社）: 外注予定＋配車表のみの限定ナビ（バッチ4・2026-10-13）
   if (B.isL3) {
-    // L3は外注予定のみ（配車表は2026-10-17 CEO指示で非公開化）
-    addTab('gaichu', '外注予定', 'users');
+    // L3は協力会社予定のみ（配車表は2026-10-17 CEO指示で非公開化）
+    addTab('gaichu', '協力会社予定', 'users');
     V = 'gaichu';
     document.getElementById('q').style.display = 'none';
     document.getElementById('newBtn').style.display = 'none';
@@ -586,7 +586,7 @@ function setupNav() {
     addTab('board', '進行ボード', 'square-kanban');
     addTab('search', '検索', 'search');
     addTab('done', '完了アーカイブ', 'archive');
-    if (B.gaichuAccess === 'all') addTab('gaichu', '外注予定', 'users');
+    if (B.gaichuAccess === 'all') addTab('gaichu', '協力会社予定', 'users');
     if (B.isAdmin) {
       addTab('keihiadmin', '経費承認', 'briefcase');
       addTab('log', '操作ログ', 'file-text');
@@ -768,7 +768,7 @@ function renderLineLinkView(data) {
   return issueBtn + '<div class="tbl-wrap"><table class="lt">' +
     '<tr><th>LINE表示名</th><th>紐付け氏名</th><th>権限</th><th>招待コード</th><th>状態</th><th>申請日時</th><th>承認日時</th><th>操作</th></tr>' +
     rows + '</table>' +
-    '<p style="font-size:11px;color:#8895a2;margin-top:8px">権限: L0=管理者相当 / L1=管理（外注予定の会社切替可） / L2=社員 / L2b=専属外注（添付「名簿」閲覧不可） / L3=協力会社（外注予定[自社分のみ]＋配車表だけ表示・所属会社が必須）<br>' +
+    '<p style="font-size:11px;color:#8895a2;margin-top:8px">権限: L0=管理者相当 / L1=管理（協力会社予定の会社切替可） / L2=社員 / L2b=専属外注（添付「名簿」閲覧不可） / L3=協力会社（協力会社予定[自社分のみ]だけ表示・所属会社が必須）<br>' +
     '招待コード運用: シートに氏名・権限・所属・状態=未使用の行を用意→「コード一括発行」→コードを本人にだけ渡す。本人がコード入力すると即時承認済みになります。</p></div>';
 }
 
