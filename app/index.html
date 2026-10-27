@@ -661,6 +661,21 @@ function loadIdt_() {
   return '';
 }
 
+/* PWAではLIFFが期限切れのIDトークンを保持し続け「有効期限切れ」から抜けられないため、
+   一度だけログアウト→LINEログインし直す（5分以内の再試行はしない＝ループ防止） */
+var liffReady_ = false;
+function liffRelogin_() {
+  var k = 'mkgLiffRelogin', now = Date.now();
+  try {
+    if (now - Number(localStorage.getItem(k) || 0) < 5 * 60 * 1000) return false;
+    localStorage.setItem(k, String(now));
+  } catch (e) {}
+  liffScreen('LINEログイン画面へ移動しています...');
+  try { liff.logout(); } catch (e) {}
+  liff.login();
+  return true;
+}
+
 function startLiffFlow() {
   // 中継ページ(m-kgroup.com/portal)で取得済みのIDトークンがあればliff.init不要（GASリダイレクト相性対策）
   if (LT_TOKEN) {
@@ -672,8 +687,10 @@ function startLiffFlow() {
   if (typeof liff === 'undefined') { showDenied(); return; }
   liffScreen('LINEログイン中...');
   liff.init({ liffId: LIFF_ID }).then(function() {
+    liffReady_ = true;
     if (!liff.isLoggedIn()) { liff.login(); return; }  // ログイン画面へリダイレクト
     LINE_IDT = liff.getIDToken() || '';
+    if (LINE_IDT && idtExp_(LINE_IDT) - Date.now() < 60 * 1000 && liffRelogin_()) return;  // 期限切れトークン
     if (!LINE_IDT) {
       liffScreen('LINEの本人確認情報を取得できませんでした。一度閉じて、もう一度開いてください。');
       return;
@@ -711,6 +728,7 @@ function handleLineStatus(r) {
     // 'l3_preparing' はバッチ4（2026-10-13）で廃止。L3は 'ok' → 限定bootstrapへ
     case 'invalid':
       clearIdt_();
+      if (liffReady_ && liffRelogin_()) return;
       liffScreen('LINEの本人確認の有効期限が切れています。一度閉じて、もう一度開いてください。');
       break;
     default:
