@@ -2931,17 +2931,23 @@ function drawKyuyoAdmin(r) {
 }
 
 /* =========================================================
-   材料報告タブ（P3c: 現場×週・差分式）
+   材料報告タブ（P3c: 現場×週・差分式 → バッチ19で現場×使用日）
 ========================================================= */
 var zhCase = '';      // 選択中の現場（スケジュール取引先タイトル。旧データ互換で案件IDも可）
-var zhWeek = 'this';  // 'this' | 'last'
+var zhDay = '';       // バッチ19: 使用日 'yyyy-MM-dd'（空=今日。今週/先週の切替から変更）
 var zhPhotos = [];    // 添付予定の写真File配列（バッチ5・送信/再描画でクリア）
 var zhGenbaList = null; // バッチ10: スケジュール取引先タイトル一覧（null=未取得・'legacy'=旧案件リストで代替）
 var zhManualOn = false; // バッチ10.1: 「その他（手入力）」選択中か（見積段階の材料など）
 var zhKind = '実績';    // バッチ18: '実績'（使った材料）| '見積'（見積用・これから必要な材料）
 
+function zhToday() {
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+
 function renderZairyoHokoku() {
   zhPhotos = [];
+  if (!zhDay) zhDay = zhToday();
   // バッチ10: 現場プルダウンはスケジュール（配置スプシ）の取引先タイトルを使う。
   // 未取得なら非同期で取得して再描画。取得不可（旧GAS等）は案件リストにフォールバック
   if (zhGenbaList === null) {
@@ -2998,13 +3004,14 @@ function renderZairyoHokoku() {
         '<input id="zhManualInput" class="fsort" placeholder="現場名を入力（例: ○○工場 見積用）" style="width:220px;max-width:100%"' +
         ' value="' + esc(zhManualOn || (Array.isArray(zhGenbaList) && zhGenbaList.indexOf(zhCase) < 0) ? zhCase : '') + '" onchange="zhManualCommit(this.value)">' +
       '</span>' +
-      '<span class="chipbtn' + (zhWeek === 'this' ? ' on' : '') + '" onclick="zhSetWeek(\'this\')">今週</span>' +
-      '<span class="chipbtn' + (zhWeek === 'last' ? ' on' : '') + '" onclick="zhSetWeek(\'last\')">先週</span>' +
-      '<span id="zhWeekLabel" style="font-size:11.5px;color:#8895a2"></span>' +
+      // バッチ19（2026-11-01 CEO指示）: 日付をタップするとカレンダーが開く
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#5a6b7b">' + (isMit ? '使用予定日' : '使用日') +
+        '<input type="date" id="zhDayInput" class="fsort" value="' + esc(zhDay) + '" onclick="zhOpenPicker(this)" onchange="zhSetDay(this.value)" style="min-width:140px">' +
+      '</label>' +
     '</div>' +
     '<div class="sec" id="zhFilesSec" style="display:none"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">📄 この現場の材料資料（タップで開く）</h4>' +
       '<div id="zhFiles"></div></div>' +
-    '<div class="sec"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">この現場×週の' + (isMit ? '見積用' : '使用実績') + 'の報告済み一覧（⚠ ここにある分は入力しない）</h4>' +
+    '<div class="sec"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">この現場×日付の' + (isMit ? '見積用' : '使用実績') + 'の報告済み一覧（⚠ ここにある分は入力しない）</h4>' +
       '<div id="zhList"><div class="empty">現場を選択してください</div></div></div>' +
     '<div class="sec"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">' + (isMit ? '見積用の材料（これから必要な材料）を報告（差分だけ）' : '新しく使った材料を報告（差分だけ）') + '</h4>' +
       '<div id="zhRows"></div>' +
@@ -3092,7 +3099,8 @@ function zhManualCommit(v) {
   if (v) zhLoad();
 }
 
-function zhSetWeek(w) { zhWeek = w; render(); }
+function zhSetDay(v) { zhDay = v || zhToday(); zhLoad(); }
+function zhOpenPicker(el) { try { if (el.showPicker) el.showPicker(); } catch (e) { /* 非対応ブラウザは標準動作 */ } }
 function zhSetKind(k) { zhKind = (k === '見積') ? '見積' : '実績'; render(); }
 
 function zhAddRow() {
@@ -3122,15 +3130,13 @@ function zhLoad() {
   var list = document.getElementById('zhList');
   if (!zhCase) { if (list) list.innerHTML = '<div class="empty">現場を選択してください</div>'; return; }
   if (list) list.innerHTML = '<div class="skel-wrap"><div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div></div>';
-  run('api_getZairyoHokoku', [TOKEN, zhCase, zhWeek, zhKind], function(r) {
+  run('api_getZairyoHokoku', [TOKEN, zhCase, zhDay, zhKind], function(r) {
     if (V !== 'zairyo') return;
     var list = document.getElementById('zhList');
     if (!list) return;
     if (!r || !r.ok) { list.innerHTML = '<div class="empty">' + esc((r && r.error) || 'エラー') + '</div>'; return; }
-    var lbl = document.getElementById('zhWeekLabel');
-    if (lbl) lbl.textContent = '週: ' + r.week + '（' + r.weekLabel + '）';
     if (!r.items || !r.items.length) {
-      list.innerHTML = '<div style="font-size:12px;color:#8895a2;padding:6px 2px">この現場×週の' + (zhKind === '見積' ? '見積用の' : '') + '報告はまだありません</div>';
+      list.innerHTML = '<div style="font-size:12px;color:#8895a2;padding:6px 2px">この現場×日付の' + (zhKind === '見積' ? '見積用の' : '') + '報告はまだありません</div>';
       return;
     }
     var rows = r.items.map(function(it) {
@@ -3165,7 +3171,7 @@ function zhSubmit() {
   };
   var send = function(photos) {
     var kindSent = zhKind;
-    gasCall('api_addZairyoHokoku', [TOKEN, zhCase, zhWeek, items, memoEl ? memoEl.value : '', photos || [], kindSent],
+    gasCall('api_addZairyoHokoku', [TOKEN, zhCase, zhDay, items, memoEl ? memoEl.value : '', photos || [], kindSent],
       function(r) {
         document.getElementById('busy').style.display = 'none';
         if (btn) btn.disabled = false;
