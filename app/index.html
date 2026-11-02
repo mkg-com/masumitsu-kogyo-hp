@@ -3318,7 +3318,9 @@ function keihiFormHtml() {
         '<input id="keihiMemo" class="fsort" placeholder="内容（例: ガソリン代）" style="width:180px">' +
         '<input id="keihiGenba" class="fsort" placeholder="現場（任意）" style="width:140px">' +
         '<button class="btn save" id="keihiSendBtn" style="flex:none;padding:8px 18px" onclick="keihiSubmit()">申請</button>' +
+        '<a class="addr-link" id="keihiEditCancel" style="display:none;white-space:nowrap" onclick="keihiEditEnd()">変更をやめる</a>' +
       '</div>' +
+      '<div id="keihiEditNote" style="display:none;font-size:11px;color:#1a5ca0;margin-top:6px"></div>' +
       '<div style="margin-top:8px;max-width:420px">' +
         '<a class="addr-link" onclick="document.getElementById(\'keihiFileInput\').click()">📷 領収書を添付（画像・PDF・' + UP_MAX_FILES + '枚まで）</a>' +
         '<input type="file" id="keihiFileInput" accept="image/*,application/pdf,.pdf,.heic" multiple style="display:none" onchange="keihiFilesChanged(this)">' +
@@ -3329,6 +3331,7 @@ function keihiFormHtml() {
 
 function renderKeihi() {
   keihiReceipts = [];
+  keihiEditing = null;
   var el = document.getElementById('view');
   if (B.keihiAccess === 'admin') {
     // 管理者＝社員と同じ画面（フォーム＋自分の一覧）＋管理者用の全員一覧（CEO指示 2026-10-13）
@@ -3398,6 +3401,10 @@ function keihiLoadMine() {
       var cancelBtn = (it.status === '確認中' && it.key)
         ? '<a class="addr-link" style="color:#a02020;white-space:nowrap" onclick="keihiCancel(' + i + ')">🗑 取消</a>'
         : '';
+      // 変更は「確認中」「差戻」のみ（差戻は変更すると確認中で再申請・バッチ21）
+      if ((it.status === '確認中' || it.status === '差戻') && it.key) {
+        cancelBtn = '<a class="addr-link" style="white-space:nowrap" onclick="keihiEditStart(' + i + ')">✏ 変更</a> ' + cancelBtn;
+      }
       return '<tr><td>' + esc(it.date) + '</td><td style="text-align:right">' + Number(it.amount || 0).toLocaleString() + '円</td>' +
         '<td>' + esc(it.memo) + '</td><td>' + keihiPhotoLinks(it.photo) + '</td>' +
         '<td>' + keihiStatusChip(it.status) + '</td><td>' + esc(it.submitted) + '</td><td>' + cancelBtn + '</td></tr>';
@@ -3424,6 +3431,48 @@ function keihiCancel(i) {
     });
 }
 
+/* ---- 経費申請: 本人変更（バッチ21・2026-11-02） ---- */
+var keihiEditing = null; // 変更中の申請（keihiMineの要素）。null=新規申請モード
+
+// 内容列F「内容（現場: ○○）」「現場: ○○」を入力欄用に内容・現場へ分ける
+function keihiSplitMemo(memo) {
+  memo = String(memo || '');
+  var m = memo.match(/^(.*)（現場: (.*)）$/);
+  if (m) return { memo: m[1], genba: m[2] };
+  m = memo.match(/^現場: (.*)$/);
+  if (m) return { memo: '', genba: m[1] };
+  return { memo: memo === '経費' ? '' : memo, genba: '' };
+}
+
+function keihiEditStart(i) {
+  var it = keihiMine[i];
+  if (!it || !it.key) { toast('対象が特定できません。画面を更新してください'); return; }
+  keihiEditing = it;
+  var sp = keihiSplitMemo(it.memo);
+  var set = function(id, v) { var e = document.getElementById(id); if (e) e.value = v; };
+  set('keihiDate', it.date); set('keihiAmount', it.amount); set('keihiMemo', sp.memo); set('keihiGenba', sp.genba);
+  keihiReceipts = []; keihiDrawFileList();
+  var btn = document.getElementById('keihiSendBtn'); if (btn) btn.textContent = '変更を保存';
+  var c = document.getElementById('keihiEditCancel'); if (c) c.style.display = '';
+  var note = document.getElementById('keihiEditNote');
+  if (note) {
+    note.style.display = '';
+    note.textContent = '✏ ' + it.date + ' ' + Number(it.amount || 0).toLocaleString() + '円 の申請を変更中。' +
+      '領収書は添付すると差し替え、添付しなければ今のまま。' + (it.status === '差戻' ? '保存すると「確認中」で再申請になります。' : '');
+  }
+  window.scrollTo(0, 0);
+}
+
+function keihiEditEnd() {
+  keihiEditing = null;
+  var set = function(id, v) { var e = document.getElementById(id); if (e) e.value = v; };
+  set('keihiAmount', ''); set('keihiMemo', ''); set('keihiGenba', '');
+  keihiReceipts = []; keihiDrawFileList();
+  var btn = document.getElementById('keihiSendBtn'); if (btn) btn.textContent = '申請';
+  var c = document.getElementById('keihiEditCancel'); if (c) c.style.display = 'none';
+  var note = document.getElementById('keihiEditNote'); if (note) note.style.display = 'none';
+}
+
 function keihiSubmit() {
   var date = (document.getElementById('keihiDate') || {}).value || '';
   var amount = (document.getElementById('keihiAmount') || {}).value || '';
@@ -3439,8 +3488,22 @@ function keihiSubmit() {
     if (btn) btn.disabled = false;
     toast('エラー: ' + (msg || '申請に失敗しました'));
   };
+  var editing = keihiEditing;
   var send = function(receipts) {
-    gasCall('api_submitKeihi', [TOKEN, { date: date, amount: amount, memo: memo, genba: genba, receipts: receipts || [] }],
+    var payload = { date: date, amount: amount, memo: memo, genba: genba, receipts: receipts || [] };
+    if (editing) {
+      gasCall('api_updateMyKeihi', [TOKEN, editing.key, payload],
+        function(r) {
+          document.getElementById('busy').style.display = 'none';
+          if (btn) btn.disabled = false;
+          toast('申請を変更しました（状態: 確認中' + (receipts && receipts.length ? '・領収書' + receipts.length + '枚に差し替え' : '') + '）');
+          keihiEditEnd();
+          keihiLoadMine();
+        },
+        function(e) { fail(e && e.message ? e.message : '変更に失敗しました'); });
+      return;
+    }
+    gasCall('api_submitKeihi', [TOKEN, payload],
       function(r) {
         document.getElementById('busy').style.display = 'none';
         if (btn) btn.disabled = false;
