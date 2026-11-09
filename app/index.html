@@ -3210,10 +3210,28 @@ function zhSubmit() {
    電動工具管理タブ（バッチ13・2026-10-17 CEO指示）
    工具一覧はスプシ「工具マスタ」が正本（行の追加・変更がそのまま反映）。
    事務所/持出中ボタンで状態変更し、誰がいつ押したかを履歴に全記録。
+   バッチ23（2026-11-10）: 持出時に現場を必須化・取消しても履歴を残す・
+   サブメニュー（工具一覧／持出中一覧／月別・現場別＝管理者のみ）を追加。
 ========================================================= */
+var koguSub = 'list';        // バッチ23: 'list'（工具一覧）| 'out'（持出中一覧）| 'month'（月別・現場別＝管理者のみ）
+var koguGenba = '';          // 持出先の現場（端末に記憶・持出中を押すときに使う）
+try { koguGenba = localStorage.getItem('koguGenba') || ''; } catch (e) { /* 保存不可の端末は毎回入力 */ }
+var koguYm = '';             // 月別表示の対象月 'yyyy-MM'（空=今月）
+var koguGenbaList = null;    // 現場の候補（スケジュールの取引先タイトル・材料報告と同じ）
+
 function renderKogu() {
   var el = document.getElementById('view');
   el.innerHTML = '<div class="skel-wrap"><div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div></div>';
+  if (koguGenbaList === null) {
+    koguGenbaList = [];
+    gasCall('api_getZairyoGenba', [TOKEN],
+      function(r) {
+        koguGenbaList = (r && r.ok && r.genba) ? r.genba : [];
+        var dl = document.getElementById('koguGenbaDl');
+        if (dl) dl.innerHTML = koguGenbaOpts();
+      },
+      function() { /* 候補が取れなくても手入力できる */ });
+  }
   gasCall('api_getKogu', [TOKEN],
     function(r) { if (V === 'kogu') drawKogu(r); },
     function(e) {
@@ -3223,13 +3241,41 @@ function renderKogu() {
     });
 }
 
+function koguGenbaOpts() {
+  return (koguGenbaList || []).map(function(g) { return '<option value="' + esc(g) + '">'; }).join('');
+}
+
+function koguSetSub(s) { koguSub = s; renderKogu(); }
+
+function koguSetGenba(v) {
+  koguGenba = String(v || '').trim();
+  try { localStorage.setItem('koguGenba', koguGenba); } catch (e) { /* 保存不可は無視 */ }
+}
+
 function drawKogu(r) {
   var el = document.getElementById('view');
   if (!r || !r.ok || !r.tools) { el.innerHTML = '<div class="empty">工具リストを取得できませんでした</div>'; return; }
+  if (koguSub === 'month' && !r.admin) koguSub = 'list';
+  var outTools = r.tools.filter(function(t) { return t.state === '持出中'; });
+
+  // サブメニュー（工具一覧／持出中一覧／月別・現場別）
+  var subHtml =
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 16px 0">' +
+      '<span class="chipbtn' + (koguSub === 'list' ? ' on' : '') + '" onclick="koguSetSub(\'list\')">🛠 工具一覧</span>' +
+      '<span class="chipbtn' + (koguSub === 'out' ? ' on' : '') + '" onclick="koguSetSub(\'out\')">📋 持出中一覧（' + outTools.length + '）</span>' +
+      (r.admin ? '<span class="chipbtn' + (koguSub === 'month' ? ' on' : '') + '" onclick="koguSetSub(\'month\')">📅 月別・現場別</span>' : '') +
+    '</div>';
+  var bar =
+    '<div class="toolbar"><span style="font-size:12px;color:#556">持出中: <b style="color:#a05a00">' + outTools.length + '</b> / ' + r.tools.length + '点</span>' +
+    '<span class="sync-info"><button class="sync-btn" title="再取得" onclick="renderKogu()"><i data-lucide="refresh-cw"></i></button></span></div>';
+
+  if (koguSub === 'out') { el.innerHTML = subHtml + bar + koguOutHtml(outTools); icons(); return; }
+  if (koguSub === 'month') { el.innerHTML = subHtml + '<div id="koguMonth"><div class="empty">読み込み中...</div></div>'; icons(); koguLoadMonth(); return; }
+
   var cards = r.tools.map(function(t) {
     var out = t.state === '持出中';
     var meta = out
-      ? esc((t.who || '不明') + ' が持出中' + (t.at ? '（' + t.at + '）' : ''))
+      ? esc((t.who || '不明') + ' が持出中' + (t.genba ? '［' + t.genba + '］' : '') + (t.at ? '（' + t.at + '）' : ''))
       : (t.who ? esc(t.who + ' が返却' + (t.at ? '（' + t.at + '）' : '')) : '');
     return '<div class="kogu-card' + (out ? ' out' : '') + '">' +
       '<div class="kogu-name">' + esc(t.name) + '</div>' +
@@ -3245,18 +3291,101 @@ function drawKogu(r) {
       '</div>';
   }).join('');
   var histRows = (r.hist || []).map(function(h) {
-    return '<tr><td>' + esc(h.at) + '</td><td><b>' + esc(h.name) + '</b></td><td>' + esc(h.state) + '</td><td>' + esc(h.who) + '</td></tr>';
+    var undone = h.state === '取消' || (h.note || '').indexOf('取消済') === 0;
+    return '<tr' + (undone ? ' style="color:#8895a2"' : '') + '><td>' + esc(h.at) + '</td><td><b>' + esc(h.name) + '</b></td>' +
+      '<td>' + (h.state === '取消' ? '<span style="color:#c0392b">取消</span>' : esc(h.state)) + '</td><td>' + esc(h.who) + '</td>' +
+      '<td>' + esc(h.genba) + '</td><td style="font-size:11px">' + esc(h.note) + '</td></tr>';
   }).join('');
-  var outCnt = r.tools.filter(function(t) { return t.state === '持出中'; }).length;
-  el.innerHTML =
-    '<div class="toolbar"><span style="font-size:12px;color:#556">持出中: <b style="color:#a05a00">' + outCnt + '</b> / ' + r.tools.length + '点</span>' +
-    '<span class="sync-info"><button class="sync-btn" title="再取得" onclick="renderKogu()"><i data-lucide="refresh-cw"></i></button></span></div>' +
+  // 持出先の現場（持出中を押すときに使う・スケジュールの現場から選ぶか手入力）
+  var genbaHtml =
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:4px 16px 0">' +
+      '<span style="font-size:12px;color:#556;font-weight:600">持出先の現場</span>' +
+      '<input id="koguGenba" class="fsort" list="koguGenbaDl" maxlength="60" placeholder="現場を選ぶか入力（持出中を押す前に）"' +
+        ' value="' + esc(koguGenba) + '" oninput="koguSetGenba(this.value)" style="width:300px;max-width:100%">' +
+      '<datalist id="koguGenbaDl">' + koguGenbaOpts() + '</datalist>' +
+    '</div>';
+  el.innerHTML = subHtml + bar + genbaHtml +
     '<div class="kogu-grid">' + cards + '</div>' +
     (histRows
-      ? '<div class="tbl-wrap"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">直近の操作履歴（20件）</h4>' +
-        '<table class="lt"><tr><th>日時</th><th>工具</th><th>操作</th><th>操作者</th></tr>' + histRows + '</table></div>'
+      ? '<div class="tbl-wrap"><h4 style="font-size:11px;color:#8895a2;margin-bottom:6px">直近の操作履歴（20件・取消も残ります）</h4>' +
+        '<table class="lt"><tr><th>日時</th><th>工具</th><th>操作</th><th>操作者</th><th>現場</th><th>備考</th></tr>' + histRows + '</table></div>'
       : '');
   icons();
+}
+
+/* 持出中一覧: 誰が何をどの現場へ持ち出しているか（持出者ごと） */
+function koguOutHtml(outTools) {
+  if (!outTools.length) return '<div class="empty">持ち出し中の工具はありません</div>';
+  var byWho = {}, order = [];
+  outTools.forEach(function(t) {
+    var w = t.who || '不明';
+    if (!byWho[w]) { byWho[w] = []; order.push(w); }
+    byWho[w].push(t);
+  });
+  var rows = order.map(function(w) {
+    return byWho[w].map(function(t, i) {
+      return '<tr>' + (i === 0 ? '<td rowspan="' + byWho[w].length + '" style="font-weight:bold;vertical-align:top">' + esc(w) +
+        '<div style="font-size:10.5px;color:#8895a2;font-weight:normal">' + byWho[w].length + '点</div></td>' : '') +
+        '<td><b>' + esc(t.name) + '</b></td><td>' + esc(t.genba || '（現場未入力）') + '</td><td>' + esc(t.at) + '</td></tr>';
+    }).join('');
+  }).join('');
+  return '<div class="tbl-wrap"><table class="lt"><tr><th>持出者</th><th>工具</th><th>現場</th><th>持出日時</th></tr>' + rows + '</table></div>';
+}
+
+/* 月別・現場別（管理者のみ）: その月に持ち出していた工具を現場ごとに表示 */
+function koguYmNow() {
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+}
+
+function koguShiftYm(n) {
+  var ym = koguYm || koguYmNow();
+  var y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + n;
+  var d = new Date(y, m, 1);
+  koguYm = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+  koguLoadMonth();
+}
+
+function koguLoadMonth() {
+  var ym = koguYm || koguYmNow();
+  var box = document.getElementById('koguMonth');
+  if (!box) return;
+  var head =
+    '<div class="toolbar">' +
+      '<button class="sync-btn" title="前の月" onclick="koguShiftYm(-1)"><i data-lucide="chevron-left"></i></button>' +
+      '<b style="font-size:14px;color:#1565c0">' + ym.slice(0, 4) + '年' + (+ym.slice(5, 7)) + '月</b>' +
+      '<button class="sync-btn" title="次の月" onclick="koguShiftYm(1)"><i data-lucide="chevron-right"></i></button>' +
+      '<span style="font-size:10.5px;color:#8895a2">その月に1日でも持ち出していた工具（取消した操作は含みません）</span>' +
+    '</div>';
+  box.innerHTML = head + '<div class="empty">読み込み中...</div>';
+  icons();
+  gasCall('api_getKoguMonthly', [TOKEN, ym],
+    function(r) {
+      if (V !== 'kogu' || koguSub !== 'month' || (koguYm || koguYmNow()) !== ym) return;
+      var b = document.getElementById('koguMonth');
+      if (!b) return;
+      if (!r || !r.ok || !r.genba || !r.genba.length) {
+        b.innerHTML = head + '<div class="empty">この月の持出記録はありません</div>';
+        icons();
+        return;
+      }
+      var secs = r.genba.map(function(g) {
+        var rows = g.items.map(function(it) {
+          return '<tr><td><b>' + esc(it.tool) + '</b></td><td>' + esc(it.who) + '</td><td>' + esc(it.out) + '</td>' +
+            '<td>' + (it.back ? esc(it.back) : '<span style="color:#a05a00">持出中</span>') + '</td></tr>';
+        }).join('');
+        return '<div class="tbl-wrap"><h4 style="font-size:13px;color:#1565c0;margin-bottom:6px">🏗 ' + esc(g.name) +
+          '<span style="font-size:11px;color:#8895a2;font-weight:normal;margin-left:6px">' + g.items.length + '件</span></h4>' +
+          '<table class="lt"><tr><th>工具</th><th>持出者</th><th>持出</th><th>返却</th></tr>' + rows + '</table></div>';
+      }).join('');
+      b.innerHTML = head + secs;
+      icons();
+    },
+    function(e) {
+      var b = document.getElementById('koguMonth');
+      if (b) b.innerHTML = head + '<div class="empty">取得できませんでした（' + esc(e && e.message ? e.message : '') + '）</div>';
+      icons();
+    });
 }
 
 /* =========================================================
@@ -3292,12 +3421,20 @@ function renderNissan() {
 }
 
 function koguSet(name, state) {
+  // バッチ23: 持出中にするときは持出先の現場が必須（月別・現場別の集計に使う）
+  var g = state === '持出中' ? koguGenba : '';
+  if (state === '持出中' && !g) {
+    toast('先に「持出先の現場」を選ぶか入力してください');
+    var inp = document.getElementById('koguGenba');
+    if (inp) inp.focus();
+    return;
+  }
   document.getElementById('busy').style.display = 'block';
-  gasCall('api_setKogu', [TOKEN, name, state],
+  gasCall('api_setKogu', [TOKEN, name, state, g],
     function(r) {
       document.getElementById('busy').style.display = 'none';
       if (r && r.unchanged) { toast('すでに「' + state + '」です'); return; }
-      toastUndo(name + ' を「' + state + '」にしました ✓', function() { koguUndo(name); });
+      toastUndo(name + ' を「' + state + '」にしました' + (g ? '［' + g + '］' : '') + ' ✓', function() { koguUndo(name); });
       if (V === 'kogu') renderKogu();
     },
     function(e) {
