@@ -14,22 +14,29 @@ body { background:#f4f5f7; min-height:100vh; user-select:none; -webkit-user-sele
 .top { background:#1565c0; color:#fff; padding:14px 20px; display:flex; align-items:center; gap:14px; position:sticky; top:0; z-index:10; }
 .top h1 { font-size:22px; }
 .top .sub { font-size:14px; color:#cfe2fa; }
-.top .end { margin-left:auto; background:#fff; color:#1565c0; border:none; border-radius:10px; padding:12px 26px; font-size:18px; font-weight:bold; }
 .wrap { padding:16px 20px 120px; }
+.wrap.open { padding-right:150px; }
 .lead { font-size:20px; font-weight:bold; color:#0f2b52; margin:6px 0 14px; }
-.names { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; }
-.name-btn { background:#fff; border:2px solid #1565c0; color:#1565c0; border-radius:14px; padding:22px 8px; font-size:22px; font-weight:bold; }
+.names { display:flex; flex-direction:column; gap:10px; }
+.name-btn { width:100%; display:flex; align-items:center; gap:14px; text-align:left; background:#fff; border:2px solid #1565c0; color:#1565c0; border-radius:14px; padding:18px 20px; font-size:22px; font-weight:bold; }
 .name-btn:active { background:#e3eefb; }
+.name-btn .cnt { margin-left:auto; font-size:15px; font-weight:normal; color:#8895a2; }
+.name-btn.on { background:#1565c0; color:#fff; border-radius:14px 14px 0 0; }
+.name-btn.on .cnt { color:#cfe2fa; }
+.panel { background:#fff; border:2px solid #1565c0; border-top:none; border-radius:0 0 14px 14px; padding:4px 16px 18px; margin-top:-10px; }
+/* 完了ボタン: 画面右に固定（スクロールしても一緒に動く） */
+.done { position:fixed; right:18px; top:50%; transform:translateY(-50%); z-index:15; width:112px; height:112px; border-radius:50%; border:none; background:#2e7d32; color:#fff; font-size:24px; font-weight:bold; box-shadow:0 4px 14px rgba(0,0,0,.3); display:none; }
+.done:active { background:#1b5e20; }
 .summary { margin-top:22px; font-size:15px; color:#667; }
 .sec { font-size:17px; font-weight:bold; color:#0f2b52; margin:22px 0 10px; }
-.genba-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:#fff; border-radius:12px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+.genba-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:#f4f5f7; border-radius:12px; padding:14px; }
 .genba-row label { font-size:17px; font-weight:bold; color:#0f2b52; }
 #genba { flex:1; min-width:260px; font-size:20px; padding:12px; border:2px solid #c5d0db; border-radius:10px; user-select:text; -webkit-user-select:text; }
 #genba.need { border-color:#c0392b; background:#fff4f2; }
 .chips { display:flex; gap:8px; flex-wrap:wrap; width:100%; }
 .chip { background:#eef3f9; border:1px solid #c5d0db; border-radius:20px; padding:9px 16px; font-size:15px; color:#0f2b52; }
 .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; }
-.card { background:#fff; border-radius:14px; padding:14px 12px; box-shadow:0 1px 3px rgba(0,0,0,.12); border:3px solid transparent; display:flex; flex-direction:column; gap:8px; }
+.card { background:#f9fafb; border-radius:14px; padding:14px 12px; box-shadow:0 1px 3px rgba(0,0,0,.12); border:3px solid transparent; display:flex; flex-direction:column; gap:8px; }
 .card.out { background:#fdf8ef; }
 .card.busy { opacity:.5; }
 .card .nm { font-size:19px; font-weight:bold; color:#1565c0; }
@@ -45,9 +52,9 @@ body { background:#f4f5f7; min-height:100vh; user-select:none; -webkit-user-sele
 </style></head>
 <body>
 <div class="top">
-  <div><h1 id="title">🛠 工具 持出・返却</h1><div class="sub" id="subtitle">名前をタップしてから工具を選んでください</div></div>
-  <button class="end" id="endBtn" style="display:none" onclick="endSession()">終わる</button>
+  <div><h1>🛠 工具 持出・返却</h1><div class="sub">自分の名前をタップ → 工具を選ぶ → 右の「完了」</div></div>
 </div>
+<button class="done" id="doneBtn" onclick="endSession()">完了</button>
 <div class="wrap" id="view"><div class="empty">読み込み中...</div></div>
 <div class="banner" id="banner"><div class="msg" id="bannerMsg"></div><button id="bannerUndo" style="display:none">↩ 取消</button></div>
 
@@ -112,20 +119,22 @@ function load(cb) {
 function render() {
   if (!D) return;
   var outs = D.tools.filter(function(t) { return t.state === '持出中'; });
-  document.getElementById('endBtn').style.display = PERSON ? '' : 'none';
-  if (!PERSON) {
-    document.getElementById('title').textContent = '🛠 工具 持出・返却';
-    document.getElementById('subtitle').textContent = '名前をタップしてから工具を選んでください';
-    document.getElementById('view').innerHTML =
-      '<div class="lead">👤 あなたの名前をタップ</div>' +
-      (D.names.length ? '<div class="names">' + D.names.map(function(n) {
-        return '<button class="name-btn" onclick="pick(' + jsArg(n) + ')">' + esc(n) + '</button>';
-      }).join('') + '</div>' : '<div class="empty">名前の候補がありません（ポータルのLINE紐付けで承認済みの社員が出ます）</div>') +
-      '<div class="summary">いま持出中: ' + outs.length + '点 ／ 事務所: ' + (D.tools.length - outs.length) + '点</div>';
-    return;
-  }
-  document.getElementById('title').textContent = '👤 ' + PERSON + ' さん';
-  document.getElementById('subtitle').textContent = '工具をタップすると、すぐに記録されます。終わったら右の「終わる」';
+  document.getElementById('doneBtn').style.display = PERSON ? 'block' : 'none';
+  var view = document.getElementById('view');
+  view.className = 'wrap' + (PERSON ? ' open' : '');
+  if (!D.names.length) { view.innerHTML = '<div class="empty">名前の候補がありません（ポータルのLINE紐付けで承認済みの社員が出ます）</div>'; return; }
+  // 名前の一覧。タップした名前の下に工具一覧が開く（もう一度タップ or 完了で閉じる）
+  view.innerHTML = '<div class="lead">👤 自分の名前をタップ</div><div class="names">' + D.names.map(function(n) {
+    var on = n === PERSON;
+    var cnt = outs.filter(function(t) { return t.who === n; }).length;
+    return '<div id="nm-' + esc(n) + '"><button class="name-btn' + (on ? ' on' : '') + '" onclick="pick(' + jsArg(n) + ')">' +
+      (on ? '▼ ' : '▶ ') + esc(n) + '<span class="cnt">' + (cnt ? '持出中 ' + cnt + '点' : '') + '</span></button>' +
+      (on ? '<div class="panel">' + panelHtml(outs) + '</div>' : '') + '</div>';
+  }).join('') + '</div>' +
+    '<div class="summary">いま持出中: ' + outs.length + '点 ／ 事務所: ' + (D.tools.length - outs.length) + '点</div>';
+}
+
+function panelHtml(outs) {
   var mine = outs.filter(function(t) { return t.who === PERSON; });
   var others = D.tools.filter(function(t) { return t.who !== PERSON || t.state !== '持出中'; });
   var recent = recentGenba();
@@ -139,8 +148,8 @@ function render() {
     (recent.length ? '<div class="chips">' + recent.map(function(g) {
       return '<button class="chip" onclick="setGenba(' + jsArg(g) + ', true)">' + esc(g) + '</button>';
     }).join('') + '</div>' : '') + '</div>';
-  html += '<div class="sec">🛠 工具（オレンジ＝持ち出す／緑＝返す）</div><div class="grid">' + others.map(card).join('') + '</div>';
-  document.getElementById('view').innerHTML = html;
+  html += '<div class="sec">🛠 管理工具（オレンジ＝持ち出す／緑＝返す）</div><div class="grid">' + others.map(card).join('') + '</div>';
+  return html;
 }
 
 function card(t) {
@@ -152,10 +161,13 @@ function card(t) {
 }
 
 function pick(n) {
+  if (n === PERSON) { endSession(); return; } // 開いている名前をもう一度タップ＝閉じる
   PERSON = n; GENBA = '';
   touch();
   load(); // 最新の状態を取り直してから表示
   render();
+  var el = document.getElementById('nm-' + n);
+  if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset - 90);
 }
 
 function endSession() {
@@ -163,6 +175,7 @@ function endSession() {
   clearTimeout(idleTm);
   hideBanner();
   render();
+  window.scrollTo(0, 0);
 }
 
 function touch() {
