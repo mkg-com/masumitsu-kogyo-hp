@@ -101,7 +101,7 @@ function esc(s) {
 function jsArg(s) { return esc(JSON.stringify(String(s))); }
 
 function load(cb) {
-  if (!KEY) { document.getElementById('view').innerHTML = '<div class="empty">この端末は工具端末として設定されていません。<br>管理者に設定用のURLで開いてもらってください。</div>'; return; }
+  if (!KEY) { keyForm(''); return; }
   gasCall('api_koguKioskGet', [KEY],
     function(r) {
       D = r;
@@ -111,9 +111,29 @@ function load(cb) {
       cb ? cb() : render();
     },
     function(e) {
+      // キー違い・未設定はキー入力欄を出す（通信エラーは再読込ボタン）
+      if (/工具端末/.test(e.message)) { keyForm(e.message); return; }
       document.getElementById('view').innerHTML = '<div class="empty">読み込めませんでした: ' + esc(e.message) +
         '<br><br><button class="name-btn" onclick="load()">もう一度読み込む</button></div>';
     });
+}
+
+/** 工具端末キーの入力欄（初回設定・キー変更時。キーはGASの setupKoguKiosk で発行） */
+function keyForm(msg) {
+  document.getElementById('view').innerHTML = '<div class="empty">' +
+    (msg ? '<div style="color:#c0392b;margin-bottom:14px">' + esc(msg) + '</div>' : '') +
+    'この端末を工具端末にするには、管理者から聞いた<b>工具端末キー</b>を入力してください。<br><br>' +
+    '<input id="keyIn" maxlength="80" placeholder="KK-XXXXXXXXXXXX" autocapitalize="characters" autocomplete="off" ' +
+    'style="font-size:24px;padding:12px;width:360px;max-width:90%;border:2px solid #1565c0;border-radius:10px;text-align:center;user-select:text;-webkit-user-select:text"><br><br>' +
+    '<button class="name-btn" style="width:auto;display:inline-block;padding:14px 40px" onclick="saveKey()">登録する</button></div>';
+}
+function saveKey() {
+  var v = String(document.getElementById('keyIn').value || '').replace(/\s/g, '').toUpperCase();
+  if (!v) return;
+  KEY = v;
+  try { localStorage.setItem('koguKioskKey', KEY); } catch (e) { /* 保存不可の端末は開くたびに入力 */ }
+  document.getElementById('view').innerHTML = '<div class="empty">確認中...</div>';
+  load();
 }
 
 function render() {
